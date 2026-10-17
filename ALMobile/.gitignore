@@ -15,3 +15,10 @@
 local.properties
 !gradle/wrapper/gradle-wrapper.jar
 google-services.json
+*.jks
+*.keystore
+*.jks.base64
+local.properties
+gha-creds-*.json
+env/
+.env
