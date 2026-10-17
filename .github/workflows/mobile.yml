@@ -25,6 +25,8 @@
 #   VersionCode/versionName remain owned by Gradle; no undocumented override.
 # Keep the wrapper compatible with the real AGP version: AGP 9.4 requires
 # Gradle 9.6.0, JDK 17 and Build Tools 36.0.0, and supports API 37.
+# Google publishes the API 37 platform package as platforms;android-37.0.
+# This package identifier does not change the project's compileSdk/targetSdk 37.
 # WIF/IAM must independently restrict the exact repository and main branch.
 # This file cannot enforce branch protection or cloud-side trust conditions.
 # Use Dependabot's github-actions ecosystem to maintain the action SHA pins.
@@ -209,13 +211,14 @@ jobs:
         with:
           accept-android-sdk-licenses: 'true'
           log-accepted-android-sdk-licenses: 'false'
-          packages: 'platform-tools platforms;android-37 build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+          packages: 'platform-tools platforms;android-37.0 build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
 
       - name: Verify Android tools and Gradle wrapper
         run: |
           set -euo pipefail
           command -v sdkmanager
           sdkmanager --version
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
           test -x "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/apksigner"
           test -x "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
           test -x gradlew || { echo 'Commit ALMobile/gradlew with its executable bit set'; exit 1; }
