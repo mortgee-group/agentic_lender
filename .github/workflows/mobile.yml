@@ -135,8 +135,8 @@ jobs:
     timeout-minutes: 40
     env:
       STAGING_BUILD: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-      API_BASE_URL: ${{ vars.STAGING_API_URL }}
-      EXPECTED_PACKAGE: ${{ vars.ANDROID_APPLICATION_ID }}
+      STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+      ANDROID_APPLICATION_ID: ${{ vars.ANDROID_APPLICATION_ID }}
       FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
     outputs:
@@ -159,22 +159,22 @@ jobs:
         env:
           FIREBASE_TESTER_GROUP: ${{ vars.FIREBASE_TESTER_GROUP }}
           FIREBASE_CLI_VERSION: ${{ vars.FIREBASE_CLI_VERSION }}
-          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
         run: |
           python3 - <<'PY'
           import os, re
           from urllib.parse import urlsplit
 
           required = (
-              'API_BASE_URL', 'EXPECTED_PACKAGE', 'FIREBASE_APP_ID',
+              'STAGING_API_URL', 'ANDROID_APPLICATION_ID', 'FIREBASE_APP_ID',
               'GCP_PROJECT_ID', 'FIREBASE_TESTER_GROUP', 'FIREBASE_CLI_VERSION',
-              'WIF_PROVIDER', 'WIF_SERVICE_ACCOUNT',
+              'GCP_WORKLOAD_IDENTITY_PROVIDER', 'GCP_SERVICE_ACCOUNT',
           )
           missing = [key for key in required if not os.environ.get(key, '').strip()]
           if missing:
-              raise SystemExit('Missing repository variables mapped to: ' + ', '.join(missing))
-          url = os.environ['API_BASE_URL']
+              raise SystemExit('Missing repository variables: ' + ', '.join(missing))
+          url = os.environ['STAGING_API_URL']
           try:
               parsed = urlsplit(url)
               port = parsed.port
@@ -189,7 +189,7 @@ jobs:
               valid = False
           if not valid:
               raise SystemExit('STAGING_API_URL must be an HTTPS base URL ending in /, without credentials, query or fragment')
-          if not re.fullmatch(r'(?:[A-Za-z][A-Za-z0-9_]*\.)+dev', os.environ['EXPECTED_PACKAGE']):
+          if not re.fullmatch(r'(?:[A-Za-z][A-Za-z0-9_]*\.)+dev', os.environ['ANDROID_APPLICATION_ID']):
               raise SystemExit('ANDROID_APPLICATION_ID must be the exact development package ending in .dev')
           if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', os.environ['FIREBASE_CLI_VERSION']):
               raise SystemExit('FIREBASE_CLI_VERSION must be an exact x.y.z version')
@@ -268,7 +268,7 @@ jobs:
           # Do not persist signing inputs in the Gradle configuration cache.
           ./gradlew --no-daemon --no-configuration-cache --continue \
             :app:lintDebug :app:testDebugUnitTest :app:assembleDebug \
-            "-PapiBaseUrl=$API_BASE_URL"
+            "-PapiBaseUrl=$STAGING_API_URL"
           keytool -exportcert -keystore "$CI_ANDROID_KEYSTORE" \
             -alias "$ANDROID_KEY_ALIAS" -storepass:env ANDROID_KEYSTORE_PASSWORD \
             -file "$RUNNER_TEMP/development-signing-cert.der"
@@ -296,7 +296,7 @@ jobs:
           badging = subprocess.check_output([str(tools / 'aapt2'), 'dump', 'badging', str(apk)], text=True)
           package_line = next((line for line in badging.splitlines() if line.startswith('package: ')), '')
           manifest = dict(re.findall(r"(\w+)='([^']*)'", package_line))
-          if manifest.get('name') != os.environ['EXPECTED_PACKAGE']:
+          if manifest.get('name') != os.environ['ANDROID_APPLICATION_ID']:
               raise SystemExit('Built APK applicationId does not match ANDROID_APPLICATION_ID')
           if not manifest.get('versionCode', '').isdigit() or 'versionName' not in manifest:
               raise SystemExit('Could not read APK version information')
