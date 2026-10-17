@@ -15,6 +15,7 @@ __pycache__/
 
 # Firebase credentials
 credentials/
+google-service-account.json
 
 # Local editor settings
 .vscode/
