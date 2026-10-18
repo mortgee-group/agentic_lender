@@ -9,9 +9,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.mortgee.al_mobile.dev" />
-                  <option name="mobileSdkAppId" value="1:123456789012:android:abcdef1234567891" />
-                  <option name="projectId" value="al-mobile-placeholder" />
-                  <option name="projectNumber" value="123456789012" />
+                  <option name="mobileSdkAppId" value="1:525895646792:android:46803927bbee39755e627d" />
+                  <option name="projectId" value="agentic-lender-8ad70" />
+                  <option name="projectNumber" value="525895646792" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

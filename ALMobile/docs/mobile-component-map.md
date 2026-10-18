@@ -24,11 +24,6 @@ This document establishes the architecture mapping, technology choices, existing
   - Configured via `app/google-services.json`
 - **Async & Concurrency**: Kotlin Coroutines 1.11.0 (`core`, `android`, `test`), `kotlinx-coroutines-play-services` 1.11.0 (Firebase `Task.await()` support).
 - **Optimization & Rules**: Initial R8 optimization rules defined in `app/src/main/keepRules/rules.keep`.
-- **Planned Building Blocks** (To be added as feature slices are implemented):
-  - **Navigation**: Jetpack Navigation 3 (`androidx.navigation3`).
-  - **Persistence**: Room 2.8.4 (`room-runtime`, `room-ktx`, `room-compiler` via KSP), DataStore Preferences 1.2.1.
-  - **Image Loading**: Coil Compose 2.7.0.
-  - **Device Capabilities**: CameraX 1.6.1, Play Services Location 21.3.0, Accompanist Permissions 0.37.3.
 
 ---
 
@@ -38,27 +33,20 @@ This document establishes the architecture mapping, technology choices, existing
 | :--- | :--- | :--- | :--- |
 | **Dependency Catalogue** | REUSED & UPDATED | `gradle/libs.versions.toml` | Version Catalog (Hilt 2.60.1, Retrofit 2.11.0, OkHttp 4.12.0, Moshi 1.15.2, Firebase BOM 33.10.0, Coroutines 1.11.0) |
 | **Build Configuration** | REUSED & UPDATED | `build.gradle.kts`<br>`app/build.gradle.kts` | AGP 9.4.1, Java 17, Hilt, KSP, Google Services, Crashlytics, strict `apiBaseUrl` HTTPS validation, `debug` / `release` buildTypes |
-| **Firebase Configuration** | CREATED | `app/google-services.json` | Google Services JSON configuration |
 | **App Manifest & Registration** | CREATED & REGISTERED | `app/src/main/AndroidManifest.xml` | Registered `ALMobileApplication` (`android:name=".ALMobileApplication"`), Internet permission, Edge-to-Edge input adjustments |
 | **Application & DI Root** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ALMobileApplication.kt` | `@HiltAndroidApp class ALMobileApplication : Application()` |
-| **App Entry Point** | UPDATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | `@AndroidEntryPoint`, ComponentActivity, `@Inject lateinit var apiClient: ApiClient`, Edge-to-Edge Compose setup |
+| **App Entry Point & Navigation** | UPDATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | `@AndroidEntryPoint`, ComponentActivity, `@Inject lateinit var apiClient: ApiClient`, state-based List/Detail navigation |
 | **HTTP Client & Network Base** | CREATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/data/network/ApiClient.kt` | `@Singleton class ApiClient @Inject constructor(val retrofit: Retrofit)` |
-| **Dependency Injection Modules** | CREATED | `app/src/main/java/com/mortgee/al_mobile/di/NetworkModule.kt` | Hilt `@Module`, `@InstallIn(SingletonComponent::class)` providing Moshi, OkHttpClient, Retrofit |
-| **R8 Optimization Rules** | CREATED | `app/src/main/keepRules/rules.keep` | R8 keep rules |
+| **Network DTOs** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/network/model/CatalogueDtos.kt` | Moshi `@JsonClass`, `CatalogueItemDto`, `CatalogueListResponseDto` (`properties` key) |
+| **Retrofit API Service** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/network/CatalogueApiService.kt` | `GET /api/v1/properties`, `GET /api/v1/properties/{id}` |
+| **Domain Models** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/model/PropertyListing.kt` | `PropertyListing` unified domain data class |
+| **Repositories** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/repository/CatalogueRepository.kt`<br>`ApiCatalogueRepository.kt` | Coroutines Result mapping, error handling, `getPropertyDetail(id)` |
+| **Dependency Injection Modules** | CREATED | `app/src/main/java/com/mortgee/al_mobile/di/NetworkModule.kt`<br>`RepositoryModule.kt` | Hilt `@Module`, `@InstallIn(SingletonComponent::class)` |
+| **Property Catalogue UI** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/ui/catalogue/PropertyCatalogueScreen.kt`<br>`PropertyCatalogueViewModel.kt`, `PropertyCatalogueRoute.kt` | Compose Material 3, compact card with location & spec badges |
+| **Property Detail UI** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ui/detail/PropertyDetailScreen.kt`<br>`PropertyDetailViewModel.kt`, `PropertyDetailRoute.kt` | Compose Material 3, full property specification view |
+| **Form Validation** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ui/form/PropertyFormValidator.kt` | Location, size (m²), bedrooms (0=studio), property type & BER validation |
 | **Theme & Typography** | REUSED | `app/src/main/java/com/mortgee/al_mobile/ui/theme/Theme.kt`<br>`Color.kt`, `Type.kt` | Material 3 Theme |
-| **App DI Module (General)** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/di/AppModule.kt` | Hilt `@Module`, `@InstallIn(SingletonComponent::class)` |
-| **Auth Interceptors & Transport** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/network/AuthInterceptor.kt`<br>`TokenAuthenticator.kt` | OkHttp 4 Interceptors, Retrofit |
-| **Navigation** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/navigation/AppNavigation.kt` | Navigation 3 (`NavDisplay`, Scenes), `hiltViewModel()` |
-| **Shared UI Components** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/ui/components/ErrorView.kt`<br>`LoadingView.kt` | Compose Material 3 |
-| **Cloud Auth & Database** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/firebase/` | Firebase Auth, Cloud Firestore, Firebase Storage |
-| **Coroutine Helpers & Result** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/util/Result.kt`<br>`DispatchersProvider.kt` | Coroutines, Flow, `kotlinx-coroutines-play-services` (`.await()`) |
-| **Error Models** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/model/AppError.kt` | Kotlin Sealed Interface |
-| **Session Persistence** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/local/SessionDataStore.kt` | DataStore Preferences |
-| **Database Persistence** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/local/AppDatabase.kt` | Room 2.8.4 |
-| **Repositories** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/data/repository/SessionRepository.kt`<br>`ItemRepository.kt` | Kotlin Coroutines Flow, Hilt `@Inject` |
-| **Telemetry & Messaging** | PLANNED | `app/src/main/java/com/mortgee/al_mobile/service/` | Firebase Crashlytics, Analytics, FCM, Remote Config |
-| **Unit Testing** | REUSED / UPDATED | `app/src/test/java/com/mortgee/al_mobile/ExampleUnitTest.kt` | JUnit 4, Coroutines Test |
-| **UI/Instrumented Testing** | REUSED / UPDATED | `app/src/androidTest/java/com/mortgee/al_mobile/ExampleInstrumentedTest.kt` | Espresso, Compose Test Rule |
+| **Unit Testing** | CREATED / MODIFIED | `app/src/test/java/com/mortgee/al_mobile/data/repository/ApiCatalogueRepositoryTest.kt`<br>`PropertyCatalogueViewModelTest.kt`<br>`PropertyDetailViewModelTest.kt`<br>`PropertyFormValidatorTest.kt` | JUnit 4, Coroutines Test, MockWebServer |
 
 ---
 
@@ -71,7 +59,6 @@ This document establishes the architecture mapping, technology choices, existing
    - **Firebase BOM 33.10.0**: Synchronizes dependencies across Auth, Firestore, Analytics, Storage, Crashlytics, Remote Config, and Cloud Messaging.
    - **Coroutines Play Services (`kotlinx-coroutines-play-services` 1.11.0)**: Converts Firebase `Task` instances to Kotlin coroutines `suspend` functions and `Flow` streams.
    - **Configuration File**: `app/google-services.json` provided for environment initialization.
-5. **R8 Optimization**: R8 keep rules file initialized at `app/src/main/keepRules/rules.keep` with R8 optimization scope configured in release buildType.
 
 ---
 
@@ -79,37 +66,19 @@ This document establishes the architecture mapping, technology choices, existing
 
 ### Backend Capability Inventory
 - **Auth Endpoint**: `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, Firebase Auth
-- **Data Endpoint (First Slice)**: `GET /api/v1/items` (Supports query paging, JSON response mapping), Cloud Firestore collections
+- **Data Endpoints**:
+  - `GET /api/v1/properties` (Paginated properties list response mapping `properties` array)
+  - `GET /api/v1/properties/{id}` (Direct detail lookup returning single property listing)
 - **Status of Missing APIs**: Absence of server source/API access is explicitly documented as **unresolved external dependency** rather than mocking unverified endpoints.
 
-### First Slice Endpoint Agreement
-- **Agreed Endpoint**: `GET /api/v1/items`
-- **Base Client**: `ApiClient.retrofit` pointing to `BuildConfig.API_BASE_URL`
-- **Fallback / Local Mode**: Local Room cache / Cloud Firestore backing with `Result.Success` / `Result.Error` wrapper when remote endpoint is unreachable.
-
 ---
 
-## 5. Session, Auth & Invalidation Ownership
-
-| Sub-system | Owner Class | Responsibility |
-| :--- | :--- | :--- |
-| **Logout Policy** | `SessionRepository` | Clears local DataStore session, purges Room cache, signs out Firebase Auth, emits unauthenticated state. |
-| **Credential Handling** | `SessionDataStore` & Firebase Auth | Encrypts / stores auth tokens and refresh credentials securely in DataStore; delegates federated or user auth to Firebase Auth. |
-| **Refresh Transport** | `TokenAuthenticator` (OkHttp) | Intercepts 401 HTTP responses, calls refresh token endpoint synchronously, updates tokens. |
-| **Session Invalidation** | `AuthInterceptor` & `SessionRepository` | Emits global session expiration flow to trigger Navigation 3 redirect to Login screen. |
-
----
-
-## 6. Verification & Test Execution
+## 5. Verification & Test Execution
 
 ### Automated Test Commands
 - **Local Unit Tests**:
   ```bash
   ./gradlew testDebugUnitTest
-  ```
-- **Instrumented UI Tests**:
-  ```bash
-  ./gradlew connectedAndroidTest
   ```
 - **Build & Verification**:
   ```bash
@@ -117,12 +86,9 @@ This document establishes the architecture mapping, technology choices, existing
   ```
 
 ### Acceptance Verification Checklist
-- [x] Dependency catalogue and build files verified (`libs.versions.toml`, `app/build.gradle.kts`).
-- [x] Firebase Platform dependencies and Google Services Gradle Plugin configured (`app/google-services.json`).
-- [x] Dependency injection configured using Hilt (`@HiltAndroidApp` in `ALMobileApplication.kt`, registered in `AndroidManifest.xml`, `@AndroidEntryPoint` in `MainActivity.kt`, KSP).
-- [x] Base HTTP Client initialized (`ApiClient.kt` configured with `BuildConfig.API_BASE_URL` and Moshi converter).
-- [x] Security and build configuration established (strict HTTPS `apiBaseUrl` validation, `debug` `.dev` suffix, Java 17 compile options).
-- [x] R8 keep rules file initialized (`app/src/main/keepRules/rules.keep`).
-- [x] Exact file creation paths mapped using `com.mortgee.al_mobile` package name across all existing and planned layers.
-- [x] Session, Auth, and Invalidation owners designated.
-- [x] Unresolved backend capabilities noted as missing API dependencies rather than fabricated source code.
+- [x] Listing attributes (`location`, `propertySizeSqm`, `bedrooms`, `propertyType`, `berRating`) integrated end-to-end.
+- [x] Unified DTO and domain model (`CatalogueItemDto` & `PropertyListing`).
+- [x] Detail endpoint `GET /api/v1/properties/{id}` added to `CatalogueApiService`, `CatalogueRepository`, and `ApiCatalogueRepository`.
+- [x] Compact list card and full detail screen implemented in Compose M3.
+- [x] `PropertyFormValidator` created and unit tested for property create/edit fields.
+- [x] Comprehensive unit tests passing cleanly via `testDebugUnitTest`.
