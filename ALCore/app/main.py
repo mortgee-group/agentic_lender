@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from app.auth import verify_firebase_token
 from app.users import get_user_profile
 from google.api_core.exceptions import AlreadyExists
-from app.models import UserProfile, UserProfileCreate
+from app.models import UserProfile, UserProfileCreate, UserRole
 from app.users import create_user_profile
 
 app = FastAPI(
@@ -53,8 +53,8 @@ def register_user(
     profile = UserProfile(
         uid=uid,
         email=email,
-        role="borrower",
-        display_name=data.display_name
+        role=UserRole.BORROWER,
+        display_name=data.display_name,
     )
 
     try:

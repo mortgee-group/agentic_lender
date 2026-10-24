@@ -16,4 +16,4 @@ class UserProfile(BaseModel):
     display_name: str = Field(default="")
 
 class UserProfileCreate(BaseModel):
-    display_name: str = Field(default="", max_length=100)
+    display_name: str = Field(default="", max_length=30)

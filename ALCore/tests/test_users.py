@@ -1,8 +1,11 @@
 from fastapi.testclient import TestClient
 from app.auth import verify_firebase_token
-from app.models import UserProfile
+from app.models import UserProfile, UserProfileCreate, UserRole
 from app.main import app
 from google.api_core.exceptions import AlreadyExists
+from pydantic import ValidationError
+import pytest
+
 
 client = TestClient(app)
 
@@ -38,7 +41,7 @@ def test_get_my_profile_success(monkeypatch):
     mock_profile = UserProfile(
         uid="test-user-123",
         email="test@example.com",
-        role="borrower",
+        role=UserRole.BORROWER,
         display_name="Test User"
     )
 
@@ -118,4 +121,12 @@ def test_register_user_already_exists(monkeypatch):
 
     finally:
         app.dependency_overrides.clear()
-        
+
+def test_display_name_max_length():
+    # 30 characters should be accepted
+    profile = UserProfileCreate(display_name="A" * 30)
+    assert len(profile.display_name) == 30
+
+    # 31 characters should be rejected
+    with pytest.raises(ValidationError):
+        UserProfileCreate(display_name="A" * 31)
