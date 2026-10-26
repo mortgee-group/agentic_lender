@@ -7,6 +7,11 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 
 const port = Number(process.env.AUTH_PORT || 3001);
 const usersFile = join(dirname(fileURLToPath(import.meta.url)), "users.txt");
+const rolesFile = join(dirname(fileURLToPath(import.meta.url)), "demo-roles.json");
+async function roleFor(username) {
+  const roles = JSON.parse(await readFile(rolesFile, "utf8"));
+  return roles[username] === "underwriter" ? "underwriter" : "broker";
+}
 const sessions = new Map(); // token -> username, kept in memory only
 const attempts = new Map(); // basic IP-based throttling, for local use only
 const COOKIE_NAME = "alweb_demo_session";
@@ -25,7 +30,7 @@ async function bodyJson(req){let text="";for await(const chunk of req){text+=chu
 createServer(async(req,res)=>{
  const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
  if(url.pathname==="/api/me" && req.method==="GET"){
-   const user=sessions.get(getToken(req));return user?json(res,200,{user:{username:user}}):json(res,401,{error:"Not signed in"});
+   const user=sessions.get(getToken(req));return user?json(res,200,{user:{username:user,role:await roleFor(user)}}):json(res,401,{error:"Not signed in"});
  }
  if(url.pathname==="/api/logout" && req.method==="POST"){
    sessions.delete(getToken(req));return json(res,200,{ok:true},{"Set-Cookie":`${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`});
@@ -41,7 +46,7 @@ createServer(async(req,res)=>{
      if(!matched){entry.count++;attempts.set(ip,entry);return json(res,401,{error:"Incorrect username or password"});}
      attempts.delete(ip);
      const token=randomBytes(32).toString("hex");sessions.set(token,matched.username);
-     return json(res,200,{user:{username:matched.username}},{"Set-Cookie":`${COOKIE_NAME}=${token}; ${cookieOptions}`});
+     return json(res,200,{user:{username:matched.username,role:await roleFor(matched.username)}},{"Set-Cookie":`${COOKIE_NAME}=${token}; ${cookieOptions}`});
    }catch(err){return json(res,400,{error:"Unable to process login request"});}
  }
  return json(res,404,{error:"Not found"});
