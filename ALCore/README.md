@@ -2,7 +2,7 @@
 
 This is the backend API for the Agentic Lender project, built with Python and FastAPI.
 
-It handles Firebase Authentication, user profiles, and access to Cloud Firestore. The API is hosted on Google Cloud Run so the Android and Web teams can use it during development.
+It handles Firebase Authentication, user profiles, and access to Cloud Firestore. The API is hosted on Google Cloud Run so the Android and Web can use it during development.
 
 ## Getting Started
 
@@ -156,7 +156,27 @@ The backend currently defines three user roles:
 
 These roles are defined in `app/models.py`.
 
-**Important:** Role-based permissions have not been implemented yet. The roles are currently stored in user profiles, but endpoint access restrictions based on roles are planned for a later stage.
+### Role-Based Access Control (RBAC)
+
+AL-Core implements role-based access control through the `require_role()` dependency in `app/permissions.py`.
+
+Protected endpoints can restrict access to specific roles:
+
+* **Borrower** — Access to borrower-only endpoints.
+* **Broker** — Access to broker-only endpoints.
+* **Underwriter** — Access to underwriter-only endpoints.
+
+The backend verifies the user's Firebase ID token, retrieves their role from their Firestore profile, and checks whether they have permission to access the endpoint.
+
+The permission checker returns:
+
+* **401 Unauthorized** — The Firebase ID token is missing or invalid.
+* **403 Forbidden** — The authenticated user does not have a Firestore profile or lacks the required role.
+
+RBAC is covered by automated tests in `tests/test_permissions.py`, including all nine combinations of the three roles and three protected test endpoints.
+
+**Note:** The role-specific endpoints currently exist in the test suite to verify the permission checker. Production borrower, broker, and underwriter endpoints will use this dependency as they are implemented.
+
 
 ### Registering a user profile
 
@@ -169,7 +189,24 @@ When a user registers through the backend:
 
 Users cannot assign themselves broker or underwriter roles through the registration endpoint.
 
-Broker and underwriter account provisioning will be handled separately when role-based access control is implemented.
+### Role Assignment
+
+New users are automatically assigned the `borrower` role when they register through `POST /users/me`.
+
+Users cannot assign themselves `broker` or `underwriter` roles through the registration endpoint.
+
+For the MVP, authorized project administrators can assign broker and underwriter roles directly in Firestore by updating the user's `role` field in the `users` collection.
+
+The supported role values are:
+
+* `borrower`
+* `broker`
+* `underwriter`
+
+A secure role-management API may be implemented in a later development phase.
+
+**Important:** Only authorized administrators should modify user roles. Client applications must not have permission to change their own roles.
+
 
 ## Available Endpoints
 
@@ -297,20 +334,25 @@ If you're using PowerShell without an activated virtual environment:
 
 Make sure you're inside the `ALCore` folder with Firebase credentials configured.
 
-There are currently **8 automated tests**, covering:
+There are currently **20 automated tests**, covering:
 
-* Health check
-* Authentication without a token
-* Authentication with an invalid token
-* User profile access without authentication
-* Authenticated user without a Firestore profile
-* Successful user profile retrieval
-* Borrower registration and prevention of self-assigned privileged roles
-* Duplicate profile registration
+* Backend health checks.
+* Firebase authentication, including missing and invalid tokens.
+* User profile retrieval and missing profiles.
+* Borrower registration and prevention of self-assigned privileged roles.
+* Duplicate profile registration.
+* Role-based access control (RBAC) for Borrower, Broker, and Underwriter.
+* All nine combinations of the three roles and three protected test endpoints.
+* Access denial for unauthenticated users (`401`).
+* Access denial for authenticated users without a Firestore profile (`403`).
 
-The user profile tests use mocked authentication and database operations, so they do not create real Firestore documents.
+The tests use mocked Firebase authentication and Firestore operations, so they do not create real Firestore documents.
 
-Real Firestore profile creation and retrieval have also been tested manually.
+All **20 tests pass** using:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -v
+```
 
 ## Development API
 
@@ -356,3 +398,6 @@ The following functionality has been implemented and tested:
 * Duplicate profile protection
 * Automated backend tests
 * Automatic deployment to Cloud Run
+* Role-based access control (RBAC) using `require_role()`
+* Permission checks for Borrower, Broker, and Underwriter roles
+* 20 passing automated tests, including RBAC security tests
