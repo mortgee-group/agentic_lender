@@ -1,10 +1,10 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth import verify_firebase_token
-from app.users import get_user_profile
+from app.users import get_user_profile, create_user_profile
+from app.permissions import require_role
 from google.api_core.exceptions import AlreadyExists
 from app.models import UserProfile, UserProfileCreate, UserRole
-from app.users import create_user_profile
 
 app = FastAPI(
     title="Agentic Lender Core API",
@@ -77,4 +77,36 @@ def register_user(
             status_code=409,
             detail="User profile already exists"
         )
-        
+
+
+@app.get("/borrower/dashboard")
+def borrower_dashboard(
+    profile: UserProfile = Depends(require_role(UserRole.BORROWER))
+):
+    return {
+        "message": "Borrower access granted",
+        "uid": profile.uid,
+        "role": profile.role,
+    }
+
+
+@app.get("/broker/dashboard")
+def broker_dashboard(
+    profile: UserProfile = Depends(require_role(UserRole.BROKER))
+):
+    return {
+        "message": "Broker access granted",
+        "uid": profile.uid,
+        "role": profile.role,
+    }
+
+
+@app.get("/underwriter/dashboard")
+def underwriter_dashboard(
+    profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER))
+):
+    return {
+        "message": "Underwriter access granted",
+        "uid": profile.uid,
+        "role": profile.role,
+    }
