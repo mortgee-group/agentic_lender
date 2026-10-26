@@ -1,7 +1,7 @@
 import type {LoanApplication} from "../data/sampleApplications";
 import type {PortalRole} from "../types/roles";
 import {demoDebtRatio,euro,percent,valuationGap} from "../utils/loanCalculations";
-export default function LoanFileDetail({application,role,onBack}:{application:LoanApplication|null;role:PortalRole;onBack:()=>void}){
+export default function LoanFileDetail({application,role,onBack,onOpenAudit}:{application:LoanApplication|null;role:PortalRole;onBack:()=>void;onOpenAudit:()=>void}){
  if(!application)return <section className="page active"><h1 className="page-title">Loan file unavailable</h1><p className="subtitle">This file could not be found in your permitted demonstration applications.</p><button className="btn secondary" onClick={onBack}>← Return to pipeline</button></section>;
  const gap=valuationGap(application);
  return <section className="page active">
@@ -29,11 +29,12 @@ export default function LoanFileDetail({application,role,onBack}:{application:Lo
     <p className="disclaimer">This illustrative payment-to-income ratio is not the final DTI calculation; full income, debt, mortgage terms and policy rules require backend integration.</p>
    </div>
   </div>
+  <div className="panel pad section"><h2>AI assessment</h2><p>View the associated illustrative agent findings, consensus and reasoning trail.</p><button className="btn secondary" type="button" onClick={onOpenAudit}>Open AI Audit →</button></div>
   <div className="panel pad section"><h2>Application status</h2>
    <div className="detail-row"><span>Lifecycle status</span><strong>{application.status}</strong></div>
    <div className="detail-row"><span>Submitted</span><strong>{application.submittedDate}</strong></div>
    <div className="detail-row"><span>Assigned broker</span><strong>{application.broker}</strong></div>
-   <p className="disclaimer">The AI reasoning record, approval signatures and immutable ledger trail will be connected in later stages. This page is read-only.</p>
+   <p className="disclaimer">Actual AI records, approval signatures and immutable ledger trail will be connected in later stages. This page is read-only.</p>
   </div>
  </section>;
 }

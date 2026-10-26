@@ -1,54 +1,47 @@
-# AL-Web – React + TypeScript (complete prototype with demo login)
+# Agentic Lender — AL-Web
 
-Includes Dashboard, New Valuation, Valuation Results, AI Insights, Valuation History, About and Login.
-The original AL-Web sample records and styling are retained. Valuations and AI insights are simulated.
+React + TypeScript + Vite portal for **mortgage brokers and bank underwriters**, matching the GroupProject-Year3-2026 specification.
 
-## Start on Windows, macOS or Linux
+## Current frontend features
 
-Install an active Node.js LTS release, then run from this folder:
+- Broker dashboard and assigned-client loan pipeline
+- Underwriter dashboard and fictional portfolio overview
+- Search, status/risk/LTV filters, sorting and read-only loan details
+- AI Audit & Deliberation view showing **synthetic**, per-application agent findings and illustrative consensus
+- Stress Testing and Settlement & Export placeholders
+- Local AL-Core /health connectivity indicator
 
-```bash
-npm install
+Earlier valuation form/results components remain in source for possible reuse, but are no longer linked to the active portal.
+
+## Run locally
+
+From this folder:
+
+```powershell
+npm ci
+npm run build
 npm run dev:all
 ```
 
-Open the Vite local address printed in the terminal (usually http://localhost:5173).
-The combined command starts **both** the Vite frontend and the local login API server.
+Open http://localhost:5173. `dev:all` starts Vite and the local Node demo authentication service.
 
-Alternatively, use two terminals:
+Create an ignored `server/users.txt` with **fictional test-only credentials** if it does not exist:
 
-- Terminal 1: `npm run server`
-- Terminal 2: `npm run dev`
-
-`npm run dev` **alone is not enough for login**.
-
-## Test users
-
-Credentials are read from **`server/users.txt`**, in `username:password` format:
-
-- `ed` / `Demo1234!`
-- `student` / `College2026!`
-
-You can change these credentials in `server/users.txt`. Changes take effect on the next login attempt; no restart needed. Use *fictional test passwords only*. The file is excluded by `.gitignore`; if collaborating, create your own copy and don't commit real credentials. For a new checkout, the package contains the initial file.
-
-## Login implementation
-
-- Login screen built in `src/pages/Login.tsx` and styled consistently with the other pages.
-- React sends credentials to local `POST /api/login`, and checks `GET /api/me` on refresh.
-- Local Node server (`server/server.mjs`) reads `server/users.txt`, compares credentials, and creates a random server-side session.
-- Browser receives an `HttpOnly`, `SameSite=Lax` cookie rather than a password or token in local storage.
-- `POST /api/logout` invalidates the session; the app returns to Login.
-- Vite proxy forwards `/api` to `http://127.0.0.1:3001` during development.
-- Login is retained across browser refresh while the server is running. Sessions disappear if the server restarts.
-
-## Important limitations
-
-**This is a LOCAL DEVELOPMENT TEST ONLY, not production authentication.** Plain-text passwords are insecure and must **never** be used for real user accounts. The Node service is deliberately bound to the localhost interface and is not a production API. The React login is a frontend gate; it does *not* secure a future AL-Core API. AL-Core must independently authenticate and authorise every protected API operation before deployment. Add password hashes (e.g. Argon2id), HTTPS, proper session expiry, CSRF protection and database-backed users for production. Browser data and generated valuations are still mock/session data and are not saved to the backend.
-
-## Build frontend
-
-```bash
-npm run build
+```text
+ed:Demo1234!
+student:College2026!
 ```
 
-A frontend production build does **not** include a deployed authentication backend; login requires the local Node demo server. This setup is designed only for local testing.
+`server/demo-roles.json` maps `ed` to Broker and `student` to Underwriter. Role mapping is not secure or production-ready. Sessions are ephemeral and credentials are stored locally in plain text. Never use real passwords or deploy this authentication service.
+
+To check AL-Core status, run FastAPI on http://127.0.0.1:8000 and put `VITE_API_BASE_URL=http://127.0.0.1:8000` into ignored `.env.local`.
+
+## Integration limitations
+
+- All application and agent audit content is **fabricated UI sample data**, not borrower records, machine-learning estimates, AI-generated outcomes, or real underwriting decisions.
+- AL-Web currently checks only the AL-Core health endpoint; it does not submit loans or access protected APIs.
+- AL-Core must enforce Firebase authentication and broker-assignment/underwriter permissions. Client-side filtering cannot enforce data security.
+- The actual agent API output contract, DTI definitions, stress tests, credit memoranda and ledger approvals remain to be integrated.
+- Do not use this prototype to make real lending decisions.
+
+See `STAGE3-TESTING.md` for the acceptance checklist.
