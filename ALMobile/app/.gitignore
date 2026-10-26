@@ -1,0 +1,8 @@
+/build
+*.jks
+*.keystore
+*.jks.base64
+local.properties
+gha-creds-*.json
+env/
+.env

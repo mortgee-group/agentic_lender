@@ -1,0 +1,456 @@
+# Install at: agentic_lender/.github/workflows/mobile.yml
+# Android root: ALMobile/ ; module: :app ; single debug variant, no APK splits.
+# PRs and non-main manual runs: lint, JVM tests and build; no signing secrets.
+# Main pushes/manual runs: build/check staging once, retain it, then distribute.
+# Secret scanning must pass before any Android build or signing step starts.
+# Unit and JVM integration tests in app/src/test run in :app:testDebugUnitTest.
+#
+# Required repository VARIABLES for main:
+#   STAGING_API_URL                https://your-staging-host/api/ (trailing /)
+#   ANDROID_APPLICATION_ID         exact development package, ending in .dev
+#   FIREBASE_APP_ID                Firebase Android app ID for that exact package
+#   GCP_PROJECT_ID                 Firebase/Google Cloud project ID
+#   FIREBASE_TESTER_GROUP          existing Firebase tester group alias
+#   FIREBASE_CLI_VERSION           reviewed exact firebase-tools version (x.y.z)
+#   GCP_WORKLOAD_IDENTITY_PROVIDER full projects/.../providers/... resource name
+#   GCP_SERVICE_ACCOUNT           dedicated App Distribution service account email
+# Required repository SECRETS:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#
+# Gradle contract (must already exist in app/build.gradle.kts):
+#   -PapiBaseUrl sets the API URL; without it, PR tests use fakes/default config.
+#   CI_ANDROID_KEYSTORE and the three signing variables configure debug signing.
+#   Google Services plugin uses app/src/debug/google-services.json or app/ fallback.
+#   VersionCode/versionName remain owned by Gradle; no undocumented override.
+# Keep the wrapper compatible with the real AGP version: AGP 9.4 requires
+# Gradle 9.6.0, JDK 17 and Build Tools 36.0.0, and supports API 37.
+# Google publishes the API 37 platform package as platforms;android-37.0.
+# This package identifier does not change the project's compileSdk/targetSdk 37.
+# WIF/IAM must independently restrict the exact repository and main branch.
+# This file cannot enforce branch protection or cloud-side trust conditions.
+# Use Dependabot's github-actions ecosystem to maintain the action SHA pins.
+# Keep the pinned Gitleaks version AND archive SHA-256 updated together.
+# Secret scan scope: fetched Git history and the checked-out repository, using
+# Gitleaks' default detectors. It does not inspect runtime logs or built APKs.
+# Required checks, where branch protection is available: Secret scan, Android checks.
+# Instrumented tests, real backend checks and release/R8 checks are separate scope.
+
+name: Mobile CI and delivery
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ALMobile
+
+# Cancel obsolete PR checks. Never interrupt a running main delivery.
+# GitHub keeps one pending run per group: newer pending main runs replace older
+# pending runs. This intentionally delivers completed runs plus the latest pending.
+concurrency:
+  group: mobile-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
+env:
+  ANDROID_BUILD_TOOLS: '36.0.0'
+
+jobs:
+  secret_scan:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+    steps:
+      - name: Check out complete repository history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install checksum-pinned Gitleaks CLI
+        env:
+          GITLEAKS_VERSION: '8.30.1'
+          GITLEAKS_ARCHIVE_SHA256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/gitleaks"
+          mkdir -p "$scanner_dir"
+          archive="$scanner_dir/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location --retry 3 \
+            --proto '=https' --proto-redir '=https' \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$GITLEAKS_ARCHIVE_SHA256" "$archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$scanner_dir" gitleaks
+          chmod 700 "$scanner_dir/gitleaks"
+          "$scanner_dir/gitleaks" version
+
+      - name: Define secret detection policy
+        run: |
+          # Explicit policy keeps repository config files from replacing the
+          # default detectors. Add only reviewed, narrow false-positive exceptions.
+          cat > "$RUNNER_TEMP/gitleaks-policy.toml" <<'TOML'
+          title = "Android CI secret detection"
+          [extend]
+          useDefault = true
+          TOML
+          : > "$RUNNER_TEMP/empty.gitleaksignore"
+
+      - name: Scan Git history for committed credentials
+        run: |
+          "$RUNNER_TEMP/gitleaks/gitleaks" git . \
+            --config "$RUNNER_TEMP/gitleaks-policy.toml" \
+            --gitleaks-ignore-path "$RUNNER_TEMP/empty.gitleaksignore" \
+            --ignore-gitleaks-allow \
+            --log-opts='--all --full-history' \
+            --redact=100 --verbose --no-banner --exit-code=1
+
+      - name: Scan checked-out files for credentials
+        run: |
+          "$RUNNER_TEMP/gitleaks/gitleaks" dir . \
+            --config "$RUNNER_TEMP/gitleaks-policy.toml" \
+            --gitleaks-ignore-path "$RUNNER_TEMP/empty.gitleaksignore" \
+            --ignore-gitleaks-allow \
+            --redact=100 --verbose --no-banner --exit-code=1
+
+  checks:
+    # Keep this name stable if it is configured as a required status check.
+    name: Android checks
+    needs: secret_scan
+    # Explicit failure below preserves this required check when the scan fails.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      STAGING_BUILD: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+      STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+      ANDROID_APPLICATION_ID: ${{ vars.ANDROID_APPLICATION_ID }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+    outputs:
+      staging-artifact-id: ${{ steps.staging-artifact.outputs.artifact-id }}
+    steps:
+      - name: Require successful secret scan
+        if: needs.secret_scan.result != 'success'
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo 'Secret scan did not pass; Android build, signing and delivery are blocked.'
+          exit 1
+
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate staging configuration
+        if: env.STAGING_BUILD == 'true'
+        env:
+          FIREBASE_TESTER_GROUP: ${{ vars.FIREBASE_TESTER_GROUP }}
+          FIREBASE_CLI_VERSION: ${{ vars.FIREBASE_CLI_VERSION }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from urllib.parse import urlsplit
+
+          required = (
+              'STAGING_API_URL', 'ANDROID_APPLICATION_ID', 'FIREBASE_APP_ID',
+              'GCP_PROJECT_ID', 'FIREBASE_TESTER_GROUP', 'FIREBASE_CLI_VERSION',
+              'GCP_WORKLOAD_IDENTITY_PROVIDER', 'GCP_SERVICE_ACCOUNT',
+          )
+          missing = [key for key in required if not os.environ.get(key, '').strip()]
+          if missing:
+              raise SystemExit('Missing repository variables: ' + ', '.join(missing))
+          url = os.environ['STAGING_API_URL']
+          try:
+              parsed = urlsplit(url)
+              port = parsed.port
+              valid = (
+                  parsed.scheme == 'https' and bool(parsed.hostname)
+                  and parsed.username is None and parsed.password is None
+                  and not parsed.query and not parsed.fragment
+                  and url.endswith('/') and not any(c.isspace() for c in url)
+                  and (port is None or 1 <= port <= 65535)
+              )
+          except ValueError:
+              valid = False
+          if not valid:
+              raise SystemExit('STAGING_API_URL must be an HTTPS base URL ending in /, without credentials, query or fragment')
+          if not re.fullmatch(r'(?:[A-Za-z][A-Za-z0-9_]*\.)+dev', os.environ['ANDROID_APPLICATION_ID']):
+              raise SystemExit('ANDROID_APPLICATION_ID must be the exact development package ending in .dev')
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', os.environ['FIREBASE_CLI_VERSION']):
+              raise SystemExit('FIREBASE_CLI_VERSION must be an exact x.y.z version')
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle and validate wrapper
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
+      - name: Set up Android SDK and command-line tools
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          accept-android-sdk-licenses: 'true'
+          log-accepted-android-sdk-licenses: 'false'
+          packages: 'platform-tools platforms;android-37.0 build-tools;${{ env.ANDROID_BUILD_TOOLS }}'
+
+      - name: Verify Android tools and Gradle wrapper
+        run: |
+          set -euo pipefail
+          command -v sdkmanager
+          sdkmanager --version
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          test -x "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/apksigner"
+          test -x "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/aapt2"
+          test -x gradlew || { echo 'Commit ALMobile/gradlew with its executable bit set'; exit 1; }
+      
+      - name: Restore Firebase Android configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$GOOGLE_SERVICES_JSON" ]]; then
+            echo "::error::GOOGLE_SERVICES_JSON is missing or unavailable."
+            exit 1
+          fi
+
+          umask 077
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+
+      - name: Lint, test and build without delivery credentials
+        if: env.STAGING_BUILD != 'true'
+        run: |
+          ./gradlew --no-daemon --continue \
+            :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Restore development signing key
+        if: env.STAGING_BUILD == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" || { echo 'Missing ANDROID_KEYSTORE_BASE64'; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/al-development.jks"
+
+      - name: Lint, test and build staging APK once
+        if: env.STAGING_BUILD == 'true'
+        env:
+          CI_ANDROID_KEYSTORE: ${{ runner.temp }}/al-development.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for variable in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!variable}" || { echo "Missing $variable"; exit 1; }
+          done
+          # Do not persist signing inputs in the Gradle configuration cache.
+          ./gradlew --no-daemon --no-configuration-cache --continue \
+            :app:lintDebug :app:testDebugUnitTest :app:assembleDebug \
+            "-PapiBaseUrl=$STAGING_API_URL"
+          keytool -exportcert -keystore "$CI_ANDROID_KEYSTORE" \
+            -alias "$ANDROID_KEY_ALIAS" -storepass:env ANDROID_KEYSTORE_PASSWORD \
+            -file "$RUNNER_TEMP/development-signing-cert.der"
+
+      - name: Verify APK identity, signing certificate and Firebase destination
+        if: env.STAGING_BUILD == 'true'
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, shutil, subprocess
+          from pathlib import Path
+
+          apks = list(Path('app/build/outputs/apk/debug').glob('*.apk'))
+          if len(apks) != 1:
+              raise SystemExit('Expected one debug APK; update variant paths explicitly if using flavors or splits')
+          apk = apks[0]
+          tools = Path(os.environ['ANDROID_HOME']) / 'build-tools' / os.environ['ANDROID_BUILD_TOOLS']
+          signature = subprocess.check_output(
+              [str(tools / 'apksigner'), 'verify', '--verbose', '--print-certs', str(apk)], text=True)
+          expected_cert = hashlib.sha256(
+              (Path(os.environ['RUNNER_TEMP']) / 'development-signing-cert.der').read_bytes()).hexdigest()
+          actual_certs = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', signature)
+          if [c.lower() for c in actual_certs] != [expected_cert]:
+              raise SystemExit('APK must have exactly the supplied development signing certificate')
+
+          badging = subprocess.check_output([str(tools / 'aapt2'), 'dump', 'badging', str(apk)], text=True)
+          package_line = next((line for line in badging.splitlines() if line.startswith('package: ')), '')
+          manifest = dict(re.findall(r"(\w+)='([^']*)'", package_line))
+          if manifest.get('name') != os.environ['ANDROID_APPLICATION_ID']:
+              raise SystemExit('Built APK applicationId does not match ANDROID_APPLICATION_ID')
+          if not manifest.get('versionCode', '').isdigit() or 'versionName' not in manifest:
+              raise SystemExit('Could not read APK version information')
+
+          # This is the documented source precedence for the single debug variant.
+          config = next((p for p in (Path('app/src/debug/google-services.json'),
+                                     Path('app/google-services.json')) if p.is_file()), None)
+          if config is None:
+              raise SystemExit('Missing development google-services.json')
+          data = json.loads(config.read_text())
+          if data.get('project_info', {}).get('project_id') != os.environ['GCP_PROJECT_ID']:
+              raise SystemExit('google-services.json project_id does not match GCP_PROJECT_ID')
+          matching = [c for c in data.get('client', [])
+                      if c.get('client_info', {}).get('android_client_info', {}).get('package_name')
+                      == manifest['name']]
+          if len(matching) != 1 or matching[0].get('client_info', {}).get('mobilesdk_app_id') != os.environ['FIREBASE_APP_ID']:
+              raise SystemExit('FIREBASE_APP_ID must match the exact built package in google-services.json')
+
+          bundle = Path(os.environ['RUNNER_TEMP']) / 'staging-bundle'
+          bundle.mkdir()
+          shutil.copyfile(apk, bundle / 'app.apk')
+          digest = hashlib.sha256((bundle / 'app.apk').read_bytes()).hexdigest()
+          metadata = {
+              'commit': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'application_id': manifest['name'],
+              'version_code': int(manifest['versionCode']),
+              'version_name': manifest['versionName'],
+              'firebase_app_id': os.environ['FIREBASE_APP_ID'],
+              'project_id': os.environ['GCP_PROJECT_ID'],
+              'sha256': digest,
+          }
+          (bundle / 'build-metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          (bundle / 'SHA256SUMS').write_text(f'{digest}  app.apk\n')
+          (bundle / 'release-notes.txt').write_text(
+              f"AL development build {manifest['versionName']} ({manifest['versionCode']})\n"
+              f"Commit: {metadata['commit']}\nRun: {metadata['run_id']} (attempt {metadata['run_attempt']})\n"
+              f"APK SHA-256: {digest}\n")
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f"Verified staging APK: `{manifest['name']}`\n\n"
+                            f"Version: `{manifest['versionName']}` (`{manifest['versionCode']}`)\n\n"
+                            f"SHA-256: `{digest}`\n")
+          PY
+
+      - name: Remove temporary signing files
+        if: always() && env.STAGING_BUILD == 'true'
+        run: |
+          rm -f "$RUNNER_TEMP/al-development.jks" \
+            "$RUNNER_TEMP/development-signing-cert.der"
+
+      - name: Retain exact verified staging APK and metadata
+        if: success() && env.STAGING_BUILD == 'true'
+        id: staging-artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: staging-apk-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/staging-bundle/
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Save lint and unit test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ALMobile/app/build/reports/
+            ALMobile/app/build/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  distribute:
+    name: Distribute verified staging APK
+    needs: [secret_scan, checks]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+        working-directory: delivery
+    env:
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      FIREBASE_TESTER_GROUP: ${{ vars.FIREBASE_TESTER_GROUP }}
+      FIREBASE_CLI_VERSION: ${{ vars.FIREBASE_CLI_VERSION }}
+      STAGING_ARTIFACT_ID: ${{ needs.checks.outputs.staging-artifact-id }}
+    steps:
+      # Establish the workspace before auth creates its temporary credentials file.
+      - name: Check out source without running project code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download the artifact from the successful checks job
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ needs.checks.outputs.staging-artifact-id }}
+          merge-multiple: true
+          path: delivery
+
+      - name: Verify artifact integrity and destination
+        run: |
+          set -euo pipefail
+          test -n "$STAGING_ARTIFACT_ID" || { echo 'Missing verified staging artifact ID'; exit 1; }
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path
+          metadata = json.loads(Path('build-metadata.json').read_text())
+          expected = {
+              'commit': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'firebase_app_id': os.environ['FIREBASE_APP_ID'],
+              'project_id': os.environ['GCP_PROJECT_ID'],
+          }
+          for key, value in expected.items():
+              if metadata.get(key) != value:
+                  raise SystemExit(f'Artifact metadata mismatch: {key}')
+          digest = hashlib.sha256(Path('app.apk').read_bytes()).hexdigest()
+          if digest != metadata.get('sha256'):
+              raise SystemExit('APK SHA-256 does not match build metadata')
+          if not os.environ['FIREBASE_TESTER_GROUP'].strip():
+              raise SystemExit('FIREBASE_TESTER_GROUP is required')
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', os.environ['FIREBASE_CLI_VERSION']):
+              raise SystemExit('FIREBASE_CLI_VERSION must be an exact x.y.z version')
+          PY
+
+      - name: Set up Node.js for Firebase CLI
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install selected Firebase CLI version
+        run: npm install --global "firebase-tools@$FIREBASE_CLI_VERSION"
+
+      - name: Authenticate to Google using Workload Identity Federation
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Distribute the retained APK to Firebase testers
+        run: |
+          firebase appdistribution:distribute app.apk \
+            --app "$FIREBASE_APP_ID" \
+            --groups "$FIREBASE_TESTER_GROUP" \
+            --release-notes-file release-notes.txt \
+            --non-interactive

@@ -1,0 +1,10 @@
+import {useState} from "react";
+import type {PropertyRecord} from "../types/property";
+import {euro} from "../utils/valuation";
+type Props={records:PropertyRecord[];onView:(r:PropertyRecord)=>void;onNew:()=>void};
+export default function ValuationHistory({records,onView,onNew}:Props){
+ const [search,setSearch]=useState("");const [type,setType]=useState("");
+ const shown=records.filter(r=>r.address.toLowerCase().includes(search.trim().toLowerCase())&&(!type||r.type===type));
+ return <section className="page active"><div className="flex-between"><div><span className="eyebrow">Your activity · Demo</span><h1 className="page-title">Valuation History</h1><p className="subtitle">Browse the sample properties and valuations created during this session.</p></div><button className="btn primary" onClick={onNew}>＋ New Valuation</button></div><div className="history-controls"><input aria-label="Search property addresses" placeholder="Search property addresses..." value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filter property type" value={type} onChange={e=>setType(e.target.value)}><option value="">All property types</option>{[...new Set(records.map(r=>r.type))].map(t=><option key={t}>{t}</option>)}</select></div>
+ <div className="panel"><div className="table-wrap"><table><thead><tr><th>Property Address</th><th>Property Type</th><th>Estimated Value</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>{shown.map(r=><tr key={r.id}><td><span className="strong">{r.address}</span><div style={{fontSize:11,color:"#94a0af"}}>{r.county}</div></td><td>{r.type}</td><td className="strong">{euro(r.value)}</td><td>{r.date}</td><td><span className={`status ${r.demo?"demo":""}`}>{r.demo?"Sample":"Demo created"}</span></td><td><button className="link" onClick={()=>onView(r)}>View Details →</button></td></tr>)}</tbody></table></div>{shown.length===0&&<div className="empty">No valuations match your search.</div>}</div><div className="disclaimer">Records are stored in memory only. Refreshing this page resets the demonstration data.</div></section>;
+}

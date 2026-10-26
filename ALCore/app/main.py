@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from app.auth import verify_firebase_token
 from app.users import get_user_profile
 from google.api_core.exceptions import AlreadyExists
@@ -8,6 +9,18 @@ from app.users import create_user_profile
 app = FastAPI(
     title="Agentic Lender Core API",
     version="0.1.0"
+)
+
+# Allow the local React dev app
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["*"],
 )
 
 
