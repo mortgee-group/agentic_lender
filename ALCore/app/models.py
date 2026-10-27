@@ -81,7 +81,7 @@ class LoanApplicationCreate(BaseModel):
 class LoanApplication(LoanApplicationCreate):
     # Application identity and ownership.
     # The application ID is the Firestore document ID.
-
+    
     borrowerId: str
     brokerId: str | None = None
 
@@ -104,3 +104,8 @@ class LoanApplication(LoanApplicationCreate):
     createdAt: datetime
     updatedAt: datetime
     submittedAt: datetime | None = None
+
+
+class LoanApplicationResponse(LoanApplication):
+    applicationId: str
+    

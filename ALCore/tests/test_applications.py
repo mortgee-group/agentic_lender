@@ -34,6 +34,7 @@ def test_get_application_found():
 
     mock_document = MagicMock()
     mock_document.exists = True
+    mock_document.id = "application-001"
     mock_document.to_dict.return_value = {
         "borrowerId": "borrower-123",
         "brokerId": None,
@@ -64,6 +65,7 @@ def test_get_application_found():
         result = get_application("application-001")
 
     assert result is not None
+    assert result.applicationId == "application-001"
     assert result.borrowerId == "borrower-123"
     assert result.property.county == "Kilkenny"
     assert result.lifecycleStatus.value == "APPLIED"
@@ -171,4 +173,46 @@ def test_list_applications_for_underwriter():
 
     # No borrower or broker filtering should be applied.
     mock_db.collection.return_value.where.assert_not_called()
+
+
+def test_list_applications_includes_document_id():
+    """Listed applications should include their Firestore document IDs."""
+
+    mock_document = MagicMock()
+    mock_document.id = "application-001"
+    mock_document.to_dict.return_value = {
+        "borrowerId": "borrower-123",
+        "householdAnnualGrossIncome": 75000,
+        "existingDebtLiabilities": 10000,
+        "deposit": 70000,
+        "requestedMortgageTerm": 30,
+        "sellerAskingPrice": 350000,
+        "property": {
+            "location": "Kilkenny City",
+            "county": "Kilkenny",
+            "floorArea": 115,
+            "floorAreaUnit": "SQ_METERS",
+            "bedrooms": 3,
+            "propertyType": "SEMI_DETACHED",
+            "berEnergyRating": "B2",
+        },
+        "lifecycleStatus": "APPLIED",
+        "createdAt": "2026-10-03T14:00:00Z",
+        "updatedAt": "2026-10-03T14:00:00Z",
+    }
+
+    mock_db = MagicMock()
+    mock_db.collection.return_value.where.return_value.stream.return_value = [
+        mock_document
+    ]
+
+    with patch("app.applications.db", mock_db):
+        result = list_applications_for_user(
+            uid="borrower-123",
+            role="borrower",
+        )
+
+    assert len(result) == 1
+    assert result[0].applicationId == "application-001"
+    assert result[0].borrowerId == "borrower-123"
     
