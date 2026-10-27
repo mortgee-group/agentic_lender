@@ -1,0 +1,35 @@
+steps:
+  # Build the AL-Core Docker image
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - europe-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/agentic_lender/agentic-lender:$COMMIT_SHA
+      - -f
+      - ALCore/Dockerfile
+      - ALCore
+
+  # Push the image to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - europe-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/agentic_lender/agentic-lender:$COMMIT_SHA
+
+  # Deploy to the existing Cloud Run service
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - agentic-lender
+      - --image=europe-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/agentic_lender/agentic-lender:$COMMIT_SHA
+      - --region=europe-west2
+      - --project=$PROJECT_ID
+      - --service-account=al-core-runtime@$PROJECT_ID.iam.gserviceaccount.com
+      - --quiet
+
+images:
+  - europe-west2-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/agentic_lender/agentic-lender:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
