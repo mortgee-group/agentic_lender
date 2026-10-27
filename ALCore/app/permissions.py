@@ -27,3 +27,38 @@ def require_role(*allowed_roles: UserRole):
         return profile
 
     return check_role
+
+
+def test_broker_cannot_create_application():
+    def mock_broker():
+        return {"uid": "broker-123"}
+
+    def deny_broker():
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient permissions",
+        )
+
+    borrower_dependency = next(
+        dependency.call
+        for route in app.routes
+        if getattr(route, "path", None) == "/applications"
+        and "POST" in getattr(route, "methods", set())
+        for dependency in route.dependant.dependencies
+    )
+
+    app.dependency_overrides[borrower_dependency] = deny_broker
+
+    try:
+        with patch("app.main.create_application") as mock_create:
+            response = client.post("/applications", json={})
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Insufficient permissions"
+        mock_create.assert_not_called()
+
+    finally:
+        app.dependency_overrides.clear()
+        

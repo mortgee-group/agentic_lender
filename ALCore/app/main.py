@@ -4,7 +4,17 @@ from app.auth import verify_firebase_token
 from app.users import get_user_profile, create_user_profile
 from app.permissions import require_role
 from google.api_core.exceptions import AlreadyExists
-from app.models import UserProfile, UserProfileCreate, UserRole
+from app.applications import (
+    create_application,
+    get_application,
+    list_applications_for_user,
+)
+from app.models import (
+    UserProfile,
+    UserProfileCreate,
+    UserRole,
+    LoanApplicationCreate,
+)
 
 app = FastAPI(
     title="Agentic Lender Core API",
@@ -110,3 +120,71 @@ def underwriter_dashboard(
         "uid": profile.uid,
         "role": profile.role,
     }
+
+
+@app.post("/applications", status_code=201)
+def submit_application(
+    data: LoanApplicationCreate,
+    profile: UserProfile = Depends(require_role(UserRole.BORROWER)),
+):
+    application_id = create_application(
+        borrower_id=profile.uid,
+        application_data=data,
+    )
+
+    return {
+        "applicationId": application_id,
+        "message": "Mortgage application created successfully",
+    }
+
+
+@app.get("/applications/{application_id}")
+def retrieve_application(
+    application_id: str,
+    profile: UserProfile = Depends(
+        require_role(
+            UserRole.BORROWER,
+            UserRole.BROKER,
+            UserRole.UNDERWRITER,
+        )
+    ),
+):
+    application = get_application(application_id)
+
+    if application is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    if profile.role == UserRole.BORROWER:
+        if application.borrowerId != profile.uid:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions",
+            )
+
+    elif profile.role == UserRole.BROKER:
+        if application.brokerId != profile.uid:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions",
+            )
+
+    return application
+
+
+@app.get("/applications")
+def list_applications(
+    profile: UserProfile = Depends(
+        require_role(
+            UserRole.BORROWER,
+            UserRole.BROKER,
+            UserRole.UNDERWRITER,
+        )
+    ),
+):
+    return list_applications_for_user(
+        uid=profile.uid,
+        role=profile.role.value,
+    )
