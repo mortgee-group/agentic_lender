@@ -1,11 +1,16 @@
 from unittest.mock import patch
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
-
 from app.main import app
-from app.models import UserProfile, UserRole, LoanApplication, PropertyDetails
 from app.permissions import require_role
 from app.auth import verify_firebase_token
+from app.models import (
+    LoanApplication,
+    LoanApplicationResponse,
+    PropertyDetails,
+    UserProfile,
+    UserRole,
+)
 
 
 client = TestClient(app)
@@ -128,7 +133,8 @@ def test_real_permissions_reject_broker():
 
 
 def test_borrower_can_retrieve_own_application():
-    application = LoanApplication(
+    application = LoanApplicationResponse(
+        applicationId="application-001",
         borrowerId="borrower-123",
         householdAnnualGrossIncome=75000,
         existingDebtLiabilities=10000,
@@ -216,7 +222,8 @@ def test_borrower_cannot_retrieve_another_application():
 
 
 def test_broker_can_retrieve_assigned_application():
-    application = LoanApplication(
+    application = LoanApplicationResponse(
+        applicationId="application-001",
         borrowerId="borrower-123",
         brokerId="broker-456",
         householdAnnualGrossIncome=75000,
@@ -314,7 +321,8 @@ def test_broker_cannot_retrieve_unassigned_application():
 
 
 def test_underwriter_can_retrieve_any_application():
-    application = LoanApplication(
+    application = LoanApplicationResponse(
+        applicationId="application-001",
         borrowerId="borrower-123",
         brokerId="broker-456",
         householdAnnualGrossIncome=75000,

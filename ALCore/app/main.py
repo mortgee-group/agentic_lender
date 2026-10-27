@@ -14,6 +14,7 @@ from app.models import (
     UserProfileCreate,
     UserRole,
     LoanApplicationCreate,
+    LoanApplicationResponse,
 )
 
 app = FastAPI(
@@ -138,7 +139,10 @@ def submit_application(
     }
 
 
-@app.get("/applications/{application_id}")
+@app.get(
+    "/applications/{application_id}",
+    response_model=LoanApplicationResponse,
+)
 def retrieve_application(
     application_id: str,
     profile: UserProfile = Depends(
@@ -174,7 +178,7 @@ def retrieve_application(
     return application
 
 
-@app.get("/applications")
+@app.get("/applications", response_model=list[LoanApplicationResponse])
 def list_applications(
     profile: UserProfile = Depends(
         require_role(
