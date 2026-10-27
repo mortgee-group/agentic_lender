@@ -210,12 +210,31 @@ A secure role-management API may be implemented in a later development phase.
 
 ## Available Endpoints
 
-| Method | Endpoint    | Authentication | What it does                                          |
-| ------ | ----------- | -------------- | ----------------------------------------------------- |
-| GET    | `/health`   | No             | Checks that the backend is running                    |
-| GET    | `/auth/me`  | Yes            | Returns the authenticated user's Firebase UID         |
-| GET    | `/users/me` | Yes            | Retrieves the authenticated user's Firestore profile  |
-| POST   | `/users/me` | Yes            | Creates a borrower profile for the authenticated user |
+| Method | Endpoint | Authentication | Description |
+|---|---|---|---|
+| GET | `/health` | No | Checks backend health |
+| GET | `/auth/me` | Yes | Returns the authenticated user's Firebase UID |
+| GET | `/users/me` | Yes | Retrieves the authenticated user's profile |
+| POST | `/users/me` | Yes | Registers a new borrower profile |
+| GET | `/borrower/dashboard` | Borrower | Tests borrower access |
+| GET | `/broker/dashboard` | Broker | Tests broker access |
+| GET | `/underwriter/dashboard` | Underwriter | Tests underwriter access |
+| POST | `/applications` | Borrower | Creates a mortgage application |
+| GET | `/applications` | Borrower, Broker, Underwriter | Lists applications accessible to the user |
+| GET | `/applications/{application_id}` | Borrower, Broker, Underwriter | Retrieves an application by ID, subject to access permissions |
+
+### API Integration Guide
+
+For detailed instructions on integrating AL-Mobile, AL-Web, and AL-AI with the backend, see:
+
+[API Integration Guide](API_INTEGRATION.md)
+
+The guide covers:
+- Firebase authentication and user registration
+- Mortgage application request and response formats
+- Role-based access permissions
+- Application lifecycle statuses
+- Current and planned API functionality
 
 ### GET `/health`
 
@@ -318,6 +337,50 @@ The Firestore connection is configured in `app/firebase.py`.
 
 User profile database operations are implemented in `app/users.py`.
 
+### Mortgage Applications Collection
+
+Mortgage applications are stored in the Firestore `applications` collection.
+
+Each application uses an automatically generated Firestore document ID.
+
+Example structure:
+
+```text
+applications/
+    application-001/
+        borrowerId: "borrower-123"
+        brokerId: null
+        householdAnnualGrossIncome: 75000
+        existingDebtLiabilities: 10000
+        deposit: 70000
+        requestedMortgageTerm: 30
+        sellerAskingPrice: 350000
+        property: {
+            location: "Kilkenny City"
+            county: "Kilkenny"
+            floorArea: 115
+            floorAreaUnit: "SQ_METERS"
+            bedrooms: 3
+            propertyType: "SEMI_DETACHED"
+            berEnergyRating: "B2"
+        }
+        lifecycleStatus: "APPLIED"
+        createdAt: <Firestore timestamp>
+        updatedAt: <Firestore timestamp>
+        submittedAt: <Firestore timestamp>
+```
+
+The `applicationId` returned by the API corresponds to the Firestore document ID. It is not stored as a separate field inside the document.
+
+Database operations are implemented in `app/applications.py`.
+
+Access permissions:
+- Borrowers can create applications and retrieve their own.
+- Brokers can retrieve applications assigned to them.
+- Underwriters can retrieve all applications.
+
+For complete request and response schemas, see [API Integration Guide](API_INTEGRATION.md).
+
 ## Running Tests
 
 To run the backend tests, use:
@@ -334,7 +397,7 @@ If you're using PowerShell without an activated virtual environment:
 
 Make sure you're inside the `ALCore` folder with Firebase credentials configured.
 
-There are currently **20 automated tests**, covering:
+There are currently **48 automated tests**, covering:
 
 * Backend health checks.
 * Firebase authentication, including missing and invalid tokens.
@@ -348,7 +411,7 @@ There are currently **20 automated tests**, covering:
 
 The tests use mocked Firebase authentication and Firestore operations, so they do not create real Firestore documents.
 
-All **20 tests pass** using:
+All **48 tests pass** using:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
@@ -400,4 +463,11 @@ The following functionality has been implemented and tested:
 * Automatic deployment to Cloud Run
 * Role-based access control (RBAC) using `require_role()`
 * Permission checks for Borrower, Broker, and Underwriter roles
-* 20 passing automated tests, including RBAC security tests
+* 48 passing automated tests covering authentication, user profiles, role-based permissions, and mortgage applications
+* Mortgage application creation with Firestore persistence
+* Mortgage application retrieval by ID
+* Role-based application listing for borrowers, brokers, and underwriters
+* Application ownership and broker assignment checks
+* Firestore document IDs included in API responses
+* FastAPI request and response validation
+* API integration documentation for AL-Mobile, AL-Web, and AL-AI
