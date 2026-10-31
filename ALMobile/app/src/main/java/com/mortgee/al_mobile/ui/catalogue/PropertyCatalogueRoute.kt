@@ -8,6 +8,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun PropertyCatalogueRoute(
     onPropertyClick: (String) -> Unit = {},
+    isTestFeatureEnabled: Boolean = false,
+    onTestFeatureClick: (() -> Unit)? = null,
     viewModel: PropertyCatalogueViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -15,6 +17,8 @@ fun PropertyCatalogueRoute(
     PropertyCatalogueScreen(
         uiState = uiState,
         onPropertyClick = onPropertyClick,
+        isTestFeatureEnabled = isTestFeatureEnabled,
+        onTestFeatureClick = onTestFeatureClick,
         onRetry = { viewModel.loadProperties() }
     )
 }
