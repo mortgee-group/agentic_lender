@@ -33,7 +33,7 @@ GROQ_API_KEY=YOUR_GROQ_API_KEY
 ## Run train_daft_housing_model_knn 
 `python -m ml.train_daft_housing_model_knn`
 ## Run train_daft_housing_model_rf
-`python -m ml.train_daft_housing_model_fr`
+`python -m ml.train_daft_housing_model_rf`
 ## Start api
 `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
@@ -72,13 +72,8 @@ endpoints via `http://localhost:8000/docs`
 ### Response
 ```json
 {
-  "bedrooms": 3,
-  "bathrooms": 2,
-  "floor_area": 110,
-  "property_type": "Detached",
-  "ber_rating": "B2",
-  "county": "Dublin",
-  "year_built": 2005
+    "model": "knn",
+    "prediction": 665584.8341768743
 }
 ```
 ## POST /api/v1/ml/predict/rf			
