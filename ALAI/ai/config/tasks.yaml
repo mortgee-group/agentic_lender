@@ -1,0 +1,68 @@
+# ai/config/tasks.yaml
+affordability_task:
+  description: >
+    Analyze the borrower's financial profile:
+    - Annual gross household income: {income}
+    - Existing debt liabilities: {debt}
+    - Deposit: {deposit}
+    - Requested mortgage term: {term_years} years
+    - Property asking price: {asking_price}
+
+    Compute:    1. Net disposable surplus after stress-tested repayments (at ECB rate + 2%)    2. Debt-to-Income (DTI) ratio    3. Maximum borrowing capacity under the 3.5x income rule    4. Affordability verdict (Pass / Marginal / Fail)
+    Return a structured JSON with fields: dti, stress_tested_repayment,
+    max_borrowing_capacity, affordability_verdict, notes.
+  expected_output: >
+    A JSON object containing dti, stress_tested_repayment,
+    max_borrowing_capacity, affordability_verdict, and explanatory notes.
+  agent: affordability_agent
+
+valuation_task:
+  description: >
+    Compare the asking price ({asking_price}) against the ML fair valuation
+    obtained from the valuation_lookup tool for the property specs: {property_specs}.
+
+    Compute:    1. Predicted fair value from the ML model    2. Overvaluation percentage (asking_price vs. predicted_value)    3. Verified Loan-to-Value (LTV) = loan_amount / predicted_value    4. Collateral risk flag (Low / Medium / High)
+    Return a structured JSON with fields: predicted_value, overvaluation_pct,
+    ltv, collateral_risk, notes.
+  expected_output: >
+    A JSON object containing predicted_value, overvaluation_pct,
+    ltv, collateral_risk, and explanatory notes.
+  agent: valuation_agent  
+
+market_research_task:
+  description: >
+    Research current market conditions relevant to Irish mortgages:
+    - Current ECB main refinancing rate
+    - Central Bank of Ireland mortgage lending trends
+    - Any recent regulatory changes affecting borrowing caps
+
+    Provide a concise summary (max 200 words) with sources where possible.
+  expected_output: >
+    A concise market context summary with current base rates,
+    trends, and regulatory notes.
+  agent: market_researcher
+
+underwriting_decision_task:
+  description: >
+    Review the outputs from the Affordability, Valuation, and Market Research tasks.
+    Determine the final lending decision:
+    - APPROVE: All checks pass
+    - CONDITIONALLY APPROVE: Minor concerns that can be mitigated
+    - DECLINE: Affordability or collateral risk is unacceptable
+
+    Return a structured JSON with fields:
+    - decision: string (APPROVE | CONDITIONALLY APPROVE | DECLINE)
+    - rationale: string
+    - ltv: float (e.g. 86.36)
+    - dti: float (percentage of gross income, e.g. 45.06 — NOT a string)
+    - risk_rating: integer 1-5
+    - conditions: list of strings (empty list if APPROVE)
+    - credit_memo: string
+  expected_output: >
+    A JSON object matching the UnderwritingDecision schema with
+    numeric ltv and dti, an integer risk_rating, and a list of conditions.
+  agent: underwriting_strategist
+  context:
+    - affordability_task
+    - valuation_task
+    - market_research_task
