@@ -7,7 +7,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, r2_score          # 👈 added r2_score
+from sklearn.metrics import mean_absolute_error, r2_score          #  added r2_score
 
 from config import CLEAN_DATA_PATH, MODEL_DIR, RF_MODEL_PATH
 from ml.clean_daft_housing_data import build_clean_dataset

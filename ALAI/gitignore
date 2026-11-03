@@ -1,0 +1,48 @@
+# --- Python virtual environment ---
+.venv/
+venv/
+env/
+
+# --- Environment variables & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Trained model artifacts (regenerate via train scripts) ---
+*.joblib
+*.pkl
+*.pickle
+
+# --- Python cache ---
+pycache/
+*.py[cod]
+*$py.class
+
+# --- pytest cache ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- PyCharm / JetBrains ---
+.idea/
+*.iml
+
+# --- VS Code (if teammates use it) ---
+.vscode/
+
+# --- Jupyter (if used) ---
+.ipynb_checkpoints/
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Build artifacts ---
+build/
+dist/
+*.egg-info/
+
+# --- CrewAI local storage ---
+db/
+*.sqlite
+*.sqlite3
