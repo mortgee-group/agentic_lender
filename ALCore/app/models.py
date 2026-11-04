@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class UserRole(str, Enum):
@@ -66,8 +66,6 @@ class PropertyDetails(BaseModel):
 
 
 class LoanApplicationCreate(BaseModel):
-    # Information supplied by the borrower through AL-Mobile.
-
     householdAnnualGrossIncome: float = Field(ge=0)
     existingDebtLiabilities: float = Field(ge=0)
     deposit: float = Field(ge=0)
@@ -76,6 +74,14 @@ class LoanApplicationCreate(BaseModel):
     sellerAskingPrice: float = Field(gt=0)
 
     property: PropertyDetails
+
+    @model_validator(mode="after")
+    def validate_deposit(self):
+        if self.deposit >= self.sellerAskingPrice:
+            raise ValueError(
+                "Deposit must be less than the property asking price"
+            )
+        return self
 
 
 class LoanApplication(LoanApplicationCreate):
