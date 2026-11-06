@@ -56,8 +56,10 @@ class PropertyDetails(BaseModel):
     location: str = Field(min_length=1)
     county: str = Field(min_length=1)
 
-    floorArea: float = Field(gt=0)
-    floorAreaUnit: Literal["SQ_METERS"] = "SQ_METERS"
+    floorArea: float = Field(
+        gt=0,
+        description="Property floor area in square metres (m²)"
+    )
 
     bedrooms: int = Field(ge=0)
     propertyType: PropertyType
