@@ -62,6 +62,8 @@ class PropertyDetails(BaseModel):
     )
 
     bedrooms: int = Field(ge=0)
+    bathrooms: int = Field(ge=0)
+    yearBuilt: int = Field(ge=1800, le=2100)
     propertyType: PropertyType
     berEnergyRating: BERCode | None = None
 
