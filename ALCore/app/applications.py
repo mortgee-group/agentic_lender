@@ -16,9 +16,20 @@ def create_application(
 
     now = datetime.now(timezone.utc)
 
+    # Calculate requested loan amount and estimated LTV.
+    requested_loan_amount = (
+        application_data.sellerAskingPrice - application_data.deposit
+    )
+
+    estimated_ltv = (
+        requested_loan_amount / application_data.sellerAskingPrice
+    ) * 100
+
     application = LoanApplication(
         **application_data.model_dump(),
         borrowerId=borrower_id,
+        requestedLoanAmount=requested_loan_amount,
+        estimatedLTV=round(estimated_ltv, 2),
         createdAt=now,
         updatedAt=now,
         submittedAt=now,

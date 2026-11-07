@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
-
+import pytest
+from pydantic import ValidationError
 from app.models import LoanApplicationCreate, PropertyDetails
 from app.applications import (
     create_application,
@@ -47,8 +48,9 @@ def test_get_application_found():
             "location": "Kilkenny City",
             "county": "Kilkenny",
             "floorArea": 115,
-            "floorAreaUnit": "SQ_METERS",
             "bedrooms": 3,
+            "bathrooms": 2,
+            "yearBuilt": 2005,
             "propertyType": "SEMI_DETACHED",
             "berEnergyRating": "B2",
         },
@@ -85,6 +87,8 @@ def test_create_application():
             county="Kilkenny",
             floorArea=115,
             bedrooms=3,
+            bathrooms=2,
+            yearBuilt=2005,
             propertyType="SEMI_DETACHED",
             berEnergyRating="B2",
         ),
@@ -106,6 +110,8 @@ def test_create_application():
     assert saved_data["borrowerId"] == "borrower-123"
     assert saved_data["property"]["county"] == "Kilkenny"
     assert saved_data["lifecycleStatus"] == "APPLIED"
+    assert saved_data["requestedLoanAmount"] == 280000
+    assert saved_data["estimatedLTV"] == 80.0
 
 
 def test_list_applications_for_borrower():
@@ -191,8 +197,9 @@ def test_list_applications_includes_document_id():
             "location": "Kilkenny City",
             "county": "Kilkenny",
             "floorArea": 115,
-            "floorAreaUnit": "SQ_METERS",
             "bedrooms": 3,
+            "bathrooms": 2,
+            "yearBuilt": 2005,
             "propertyType": "SEMI_DETACHED",
             "berEnergyRating": "B2",
         },
@@ -215,4 +222,25 @@ def test_list_applications_includes_document_id():
     assert len(result) == 1
     assert result[0].applicationId == "application-001"
     assert result[0].borrowerId == "borrower-123"
-    
+
+
+@pytest.mark.parametrize("deposit", [300000, 350000])
+def test_reject_invalid_deposit(deposit):
+    """Reject deposits equal to or greater than the asking price."""
+
+    with pytest.raises(ValidationError):
+        LoanApplicationCreate(
+            householdAnnualGrossIncome=85000,
+            existingDebtLiabilities=5000,
+            deposit=deposit,
+            requestedMortgageTerm=30,
+            sellerAskingPrice=300000,
+            property=PropertyDetails(
+                location="Naas",
+                county="Kildare",
+                floorArea=110,
+                bedrooms=3,
+                propertyType="SEMI_DETACHED",
+                berEnergyRating="B2",
+            ),
+        )
