@@ -1,4 +1,7 @@
 # ai/llms.py
+import crewai.llms.cache as _crewai_cache
+_crewai_cache.mark_cache_breakpoint = lambda msg: msg
+
 import os
 from crewai import LLM
 
@@ -18,14 +21,12 @@ def get_cloud_llm_gemini():
         max_retries=5,      
         timeout=120,
     )
+
 def get_cloud_llm_groq():
     return LLM(
-       # model="groq/groq-llm-1.0",
         model="groq/openai/gpt-oss-120b",
         api_key=os.getenv("GROQ_API_KEY"),
-        temperature=0.2,
-        max_retries=5,      
-        timeout=120,
+        temperature=0.2
     )
 
 def get_local_llm():
