@@ -53,19 +53,16 @@ BERCode = Literal[
 
 
 class PropertyDetails(BaseModel):
-    location: str = Field(min_length=1)
     county: str = Field(min_length=1)
-
-    floorArea: float = Field(
+    floor_area: float = Field(
         gt=0,
         description="Property floor area in square metres (m²)"
     )
-
     bedrooms: int = Field(ge=0)
     bathrooms: int = Field(ge=0)
-    yearBuilt: int = Field(ge=1800, le=2100)
-    propertyType: PropertyType
-    berEnergyRating: BERCode | None = None
+    year_built: int = Field(ge=1800, le=2100)
+    property_type: PropertyType
+    ber_rating: BERCode
 
 
 
