@@ -13,26 +13,59 @@ FEATURES = [
     "ber_rating", "county", "year_built",
 ]
 
+_PROPERTY_TYPE_MAP = {
+    "DETACHED": "Detached",
+    "SEMI_DETACHED": "Semi-Detached",
+    "TERRACED": "Terraced",
+    "END_OF_TERRACE": "End of Terrace",
+    "END_OF_TERRACED": "End of Terrace",
+    "APARTMENT": "Apartment",
+    "FLAT": "Apartment",
+    "DUPLEX": "Duplex",
+    "BUNGALOW": "Bungalow",
+    "SITE": "Site",
+    "UNKNOWN": "Unknown",
+}
+
+
+def _normalize_property_type(value: str) -> str:
+    if not value:
+        return "Unknown"
+    key = value.strip().upper().replace("-", "_").replace(" ", "_")
+    return _PROPERTY_TYPE_MAP.get(key, value.strip())
+
+
+def _build_features(specs: dict) -> pd.DataFrame:
+    return pd.DataFrame([{
+        "bedrooms": specs["bedrooms"],
+        "bathrooms": specs["bathrooms"],
+        "floor_area": specs["floor_area"],
+        "property_type": _normalize_property_type(specs["property_type"]),
+        "ber_rating": str(specs["ber_rating"]).strip().upper(),
+        "county": str(specs["county"]).strip().title(),
+        "year_built": specs["year_built"],
+    }])[FEATURES]
+
 
 class StressTestProperty(BaseModel):
+    county: str
+    floor_area: float
     bedrooms: float
     bathrooms: float
-    floor_area: float
+    year_built: float
     property_type: str
     ber_rating: str
-    county: str
-    year_built: float
 
 
 class StressTestApplication(BaseModel):
-    application_id: str
-    income: float
-    debt: float
+    applicationId: str
+    householdAnnualGrossIncome: float
+    existingDebtLiabilities: float
     deposit: float
-    term_years: int
-    asking_price: float
+    requestedMortgageTerm: int
+    sellerAskingPrice: float
     current_rate_pct: float
-    property_specs: StressTestProperty
+    property: StressTestProperty
 
 
 class StressTestRequest(BaseModel):
@@ -42,7 +75,7 @@ class StressTestRequest(BaseModel):
 
 
 class StressTestResult(BaseModel):
-    application_id: str
+    applicationId: str
     stressed_repayment: float
     stressed_dti: float
     stressed_ltv: float
@@ -59,7 +92,6 @@ class StressTestResponse(BaseModel):
 
 
 def _monthly_repayment(principal: float, annual_rate_pct: float, years: int) -> float:
-    """Standard amortization formula."""
     if principal <= 0:
         return 0.0
     r = (annual_rate_pct / 100.0) / 12.0
@@ -70,7 +102,6 @@ def _monthly_repayment(principal: float, annual_rate_pct: float, years: int) -> 
 
 
 def _risk_rating(dti: float, ltv: float) -> int:
-    """Simple 1-5 heuristic matching the AI committee's scale."""
     score = 1
     if dti > 35:
         score += 1
@@ -90,33 +121,30 @@ def run_stress_test(req: StressTestRequest) -> StressTestResponse:
     ltv_breach_100 = 0
 
     for app in req.applications:
-        # 1. Re-predict collateral value under assumed market drop
-        specs = app.property_specs.model_dump()
-        X = pd.DataFrame([specs])[FEATURES]
+        specs = app.property.model_dump()
+        X = _build_features(specs)
         base_value = float(_rf_model.predict(X)[0])
         stressed_value = base_value * (1 - req.property_drop_pct / 100.0)
 
-        # 2. Loan amount is fixed (deposit doesn't change under stress)
-        loan = max(app.asking_price - app.deposit, 0)
+        loan = max(app.sellerAskingPrice - app.deposit, 0)
 
-        # 3. Stress the rate
         stressed_rate = app.current_rate_pct + (req.rate_shock_bps / 100.0)
-        monthly = _monthly_repayment(loan, stressed_rate, app.term_years)
-        annual_debt_service = monthly * 12 + app.debt
+        monthly = _monthly_repayment(loan, stressed_rate, app.requestedMortgageTerm)
+        annual_debt_service = monthly * 12 + app.existingDebtLiabilities
 
-        # 4. Stressed DTI / LTV
-        stressed_dti = (annual_debt_service / app.income * 100) if app.income > 0 else 999
+        stressed_dti = (annual_debt_service / app.householdAnnualGrossIncome * 100) \
+            if app.householdAnnualGrossIncome > 0 else 999
         stressed_ltv = (loan / stressed_value * 100) if stressed_value > 0 else 999
 
-        # 5. Baseline risk (current rate) for comparison
-        base_monthly = _monthly_repayment(loan, app.current_rate_pct, app.term_years)
-        base_dti = ((base_monthly * 12 + app.debt) / app.income * 100) if app.income > 0 else 999
+        base_monthly = _monthly_repayment(loan, app.current_rate_pct, app.requestedMortgageTerm)
+        base_dti = ((base_monthly * 12 + app.existingDebtLiabilities)
+                    / app.householdAnnualGrossIncome * 100) \
+            if app.householdAnnualGrossIncome > 0 else 999
         base_ltv = (loan / base_value * 100) if base_value > 0 else 999
 
         original_rating = _risk_rating(base_dti, base_ltv)
         stressed_rating = _risk_rating(stressed_dti, stressed_ltv)
 
-        # 6. Verdict
         if stressed_dti > 50 or stressed_ltv > 100:
             verdict = "UNAFFORDABLE"
             unaffordable += 1
@@ -131,7 +159,7 @@ def run_stress_test(req: StressTestRequest) -> StressTestResponse:
             ltv_breach_100 += 1
 
         results.append(StressTestResult(
-            application_id=app.application_id,
+            applicationId=app.applicationId,
             stressed_repayment=round(monthly, 2),
             stressed_dti=round(stressed_dti, 2),
             stressed_ltv=round(stressed_ltv, 2),
