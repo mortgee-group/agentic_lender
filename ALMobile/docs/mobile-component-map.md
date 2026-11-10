@@ -7,7 +7,7 @@ This document establishes the architecture mapping, technology choices, existing
 - **Build System & Java Baseline**: AGP 9.4.1, Kotlin 2.2.10, KSP 2.3.12, Java 17 (`JavaVersion.VERSION_17`), `compileSdk` / `targetSdk` 37, Google Services Plugin 4.4.2, Firebase Crashlytics Plugin 3.0.3.
 - **Build & Security Logic**:
   - Dynamic `apiBaseUrl` Gradle property configuration with strict security validation in `app/build.gradle.kts` (HTTPS required, must end with `/`, no query/fragment/credentials/quotes/backslashes allowed).
-  - `debug` buildType configured with `applicationIdSuffix = ".dev"`, `versionNameSuffix = "-dev"`, default `API_BASE_URL` (`"https://example.invalid/"`), and optional CI keystore signing.
+  - `debug` buildType configured with `applicationIdSuffix = ".dev"`, `versionNameSuffix = "-dev"`, default `API_BASE_URL` (`"https://agentic-lender-525895646792.europe-west2.run.app/"`), and optional CI keystore signing.
   - `release` buildType configured with default production `API_BASE_URL` (`"https://api.example.com/"`) and R8 optimization scope (`setOf("androidx.**", "kotlin.**", "kotlinx.**")`).
 - **Dependency Injection**: Hilt 2.60.1 (`hilt-android`, `hilt-compiler` via KSP, `hilt-navigation-compose` 1.2.0). Application class `ALMobileApplication` annotated with `@HiltAndroidApp` and registered in `AndroidManifest.xml`; `MainActivity` annotated with `@AndroidEntryPoint`.
 - **UI Framework**: Jetpack Compose (BOM `2026.02.01`), Material 3, Material 3 Adaptive Navigation (`1.1.0`).

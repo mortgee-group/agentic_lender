@@ -10,7 +10,7 @@ plugins {
 }
 
 val developmentApiUrl = providers.gradleProperty("apiBaseUrl")
-    .orElse("https://example.invalid/")
+    .orElse("https://agentic-lender-525895646792.europe-west2.run.app/")
     .get()
 val developmentApiUri = URI(developmentApiUrl)
 require(
