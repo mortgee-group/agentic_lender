@@ -10,8 +10,10 @@ import com.mortgee.al_mobile.data.session.SessionOwner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -264,6 +266,194 @@ class PrivateTokenSeamTest {
         }
     }
 
+    @Test
+    fun `executePrivate retries once on 401 with forced refresh token and invalidates session on second 401`() = runTest {
+        val key = establishSession("uid_123", "user@example.com")
+        fakeAuthAdapter.tokenResult = Result.success("token_v1")
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        var blockCalls = 0
+        val execResult = seam.executePrivate(key, isMutation = false) { token ->
+            blockCalls++
+            if (blockCalls == 1) {
+                assertEquals("token_v1", token)
+                // Simulated 401 on first attempt
+                throw createHttpException(401)
+            } else {
+                assertEquals("token_v1", token) // default fake returned token_v1
+                // Second 401 on retried attempt
+                throw createHttpException(401)
+            }
+        }
+
+        assertEquals(2, blockCalls)
+        assertTrue(execResult.isFailure)
+        val exception = execResult.exceptionOrNull()
+        assertTrue(exception is retrofit2.HttpException)
+        assertEquals(401, (exception as retrofit2.HttpException).code())
+
+        // Verify forced token refresh was requested on the second getToken call
+        assertEquals(2, fakeAuthAdapter.tokenRequests.size)
+        assertFalse(fakeAuthAdapter.tokenRequests[0].second) // initial unforced
+        assertTrue(fakeAuthAdapter.tokenRequests[1].second) // forced refresh
+
+        // Session must be invalidated after 2nd 401 on still-current session key
+        assertNull(sessionOwner.currentKey)
+    }
+
+    @Test
+    fun `executePrivate retries once on 401 and succeeds if retried block succeeds`() = runTest {
+        val key = establishSession("uid_123", "user@example.com")
+
+        fakeAuthAdapter.customTokenHandler = { _, forceRefresh ->
+            if (forceRefresh) Result.success("refreshed_token_999") else Result.success("initial_token_111")
+        }
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        var blockCalls = 0
+        val execResult = seam.executePrivate(key, isMutation = false) { token ->
+            blockCalls++
+            if (blockCalls == 1) {
+                assertEquals("initial_token_111", token)
+                throw createHttpException(401)
+            } else {
+                assertEquals("refreshed_token_999", token)
+                "recovered_data_payload"
+            }
+        }
+
+        assertEquals(2, blockCalls)
+        assertTrue(execResult.isSuccess)
+        assertEquals("recovered_data_payload", execResult.getOrThrow())
+
+        // Session must remain active
+        assertEquals(key, sessionOwner.currentKey)
+    }
+
+    @Test
+    fun `executePrivate returns 403 failure without forced refresh retry or session invalidation`() = runTest {
+        val key = establishSession("uid_123", "user@example.com")
+        fakeAuthAdapter.tokenResult = Result.success("valid_token")
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        var blockCalls = 0
+        val execResult = seam.executePrivate(key, isMutation = false) { _ ->
+            blockCalls++
+            throw createHttpException(403)
+        }
+
+        assertEquals(1, blockCalls)
+        assertTrue(execResult.isFailure)
+        val exception = execResult.exceptionOrNull()
+        assertTrue(exception is retrofit2.HttpException)
+        assertEquals(403, (exception as retrofit2.HttpException).code())
+
+        // Forced refresh should NOT occur for 403
+        assertEquals(1, fakeAuthAdapter.tokenRequests.size)
+        assertFalse(fakeAuthAdapter.tokenRequests[0].second)
+
+        // Session must remain active on 403 permission error
+        assertEquals(key, sessionOwner.currentKey)
+    }
+
+    @Test
+    fun `executePrivate handles offline refresh by surfacing retryable network error without invalidating session`() = runTest {
+        val key = establishSession("uid_123", "user@example.com")
+
+        fakeAuthAdapter.customTokenHandler = { _, forceRefresh ->
+            if (forceRefresh) {
+                Result.failure(java.io.IOException("No internet connection"))
+            } else {
+                Result.success("initial_token")
+            }
+        }
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        var blockCalls = 0
+        val execResult = seam.executePrivate(key, isMutation = false) { _ ->
+            blockCalls++
+            throw createHttpException(401)
+        }
+
+        assertEquals(1, blockCalls)
+        assertTrue(execResult.isFailure)
+        val exception = execResult.exceptionOrNull()
+        assertTrue(exception is PrivateTokenException.TokenFetchFailed)
+
+        // Session must NOT be invalidated on offline/connectivity failure during refresh
+        assertEquals(key, sessionOwner.currentKey)
+    }
+
+    @Test
+    fun `executePrivate on mutation does not auto replay on 401 and invalidates active session`() = runTest {
+        val key = establishSession("uid_123", "user@example.com")
+        fakeAuthAdapter.tokenResult = Result.success("valid_token")
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        var blockCalls = 0
+        val execResult = seam.executePrivate(key, isMutation = true) { _ ->
+            blockCalls++
+            throw createHttpException(401)
+        }
+
+        // Mutations must not replay
+        assertEquals(1, blockCalls)
+        assertTrue(execResult.isFailure)
+        val exception = execResult.exceptionOrNull()
+        assertTrue(exception is retrofit2.HttpException)
+        assertEquals(401, (exception as retrofit2.HttpException).code())
+
+        // Active session must be invalidated on mutation 401
+        assertNull(sessionOwner.currentKey)
+    }
+
+    @Test
+    fun `executePrivate returns StaleSession and does not invalidate Session B when Session A response finishes after B signs in`() = runTest {
+        val keyA = establishSession("uid_user_A", "userA@example.com")
+        fakeAuthAdapter.tokenResult = Result.success("token_A")
+
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com/")
+
+        val blockGate = CompletableDeferred<Unit>()
+
+        val job = async {
+            seam.executePrivate(keyA, isMutation = false) { _ ->
+                blockGate.await()
+                throw createHttpException(401)
+            }
+        }
+
+        // Session B signs in while Session A's request is in flight
+        sessionOwner.invalidateSession()
+        val keyB = establishSession("uid_user_B", "userB@example.com")
+
+        // Unblock Session A's response execution
+        blockGate.complete(Unit)
+
+        val result = job.await()
+
+        assertTrue(result.isFailure)
+        val exception = result.exceptionOrNull()
+        assertTrue(exception is PrivateTokenException.StaleSession)
+
+        val staleEx = exception as PrivateTokenException.StaleSession
+        assertEquals(keyA, staleEx.capturedKey)
+        assertEquals(keyB, staleEx.currentKey)
+
+        // Session B must NOT be invalidated by Session A's late response
+        assertEquals(keyB, sessionOwner.currentKey)
+    }
+
+    private fun createHttpException(code: Int): retrofit2.HttpException {
+        val responseBody = "{\"error\":\"HTTP $code\"}".toResponseBody("application/json".toMediaTypeOrNull())
+        return retrofit2.HttpException(retrofit2.Response.error<Any>(code, responseBody))
+    }
+
     private suspend fun establishSession(uid: String, email: String): SessionKey {
         val attempt = sessionOwner.startSignInAttempt()!!
         sessionOwner.commitSession(
@@ -291,12 +481,14 @@ class PrivateTokenSeamTest {
     private class FakeAuthAdapter : AuthAdapter {
         var tokenResult: Result<String> = Result.success("default_test_token")
         var customTokenHandler: (suspend (uid: String, forceRefresh: Boolean) -> Result<String>)? = null
+        val tokenRequests = mutableListOf<Pair<String, Boolean>>()
 
         override suspend fun signIn(email: String, password: String): AuthResult {
             return AuthResult.Failure(com.mortgee.al_mobile.data.model.SignInResult.GenericFailure)
         }
 
         override suspend fun getToken(uid: String, forceRefresh: Boolean): Result<String> {
+            tokenRequests.add(uid to forceRefresh)
             val handler = customTokenHandler
             return if (handler != null) {
                 handler(uid, forceRefresh)

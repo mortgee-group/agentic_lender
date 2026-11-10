@@ -31,7 +31,7 @@ sealed class PrivateTokenException(message: String, cause: Throwable? = null) : 
 
 /**
  * Seam for obtaining SDK-managed tokens for private requests, enforcing session key validity,
- * and checking target origin security rules.
+ * checking target origin security rules, and applying bounded 401 authentication recovery.
  */
 interface PrivateTokenSeam {
     /**
@@ -51,15 +51,24 @@ interface PrivateTokenSeam {
     /**
      * Evaluates a private request block using a validated SDK token.
      *
-     * Re-checks session key validity both before dispatching and after the block completes
-     * to prevent stale result publication or cache writes.
+     * Applies bounded 401 recovery policy:
+     * - For replayable requests (isMutation = false), a 401 response triggers one forced token refresh
+     *   and at most one replay.
+     * - Rechecks the captured session key before refresh, retry, and any resulting state change.
+     * - If refresh fails due to connectivity, surfaces a retryable network error.
+     * - If refreshed token is definitively rejected (2nd 401) or SDK reports invalid user during refresh,
+     *   invalidates the identity through SessionOwner if the session key is still current.
+     * - 403 (Forbidden) is returned without retry or invalidation.
+     * - Mutations (isMutation = true) do not auto-replay. On 401, if key is current, identity is invalidated.
      *
      * @param entryKey The session key captured at request entry point.
+     * @param isMutation Whether the request is a mutation (default false).
      * @param block The suspendable request execution block receiving the bearer token.
      * @return [Result.success] with result of block, or [Result.failure] if session is stale/missing or block failed.
      */
     suspend fun <T> executePrivate(
         entryKey: SessionKey?,
+        isMutation: Boolean = false,
         block: suspend (token: String) -> T
     ): Result<T>
 
