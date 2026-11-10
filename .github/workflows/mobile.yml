@@ -105,6 +105,19 @@ jobs:
           title = "Android CI secret detection"
           [extend]
           useDefault = true
+
+          [allowlist]
+          description = "Allow trusted non-secret example API endpoints and test origins in PrivateTokenSeamTest"
+          regexes = [
+            '''(?i)gateway\.example\.org''',
+            '''(?i)api\.example\.com''',
+            '''(?i)example\.org''',
+            '''(?i)example\.com''',
+            '''(?i)untrusted-api\.com''',
+            '''(?i)untrusted\.example\.org''',
+            '''(?i)9443/v1/''',
+            '''(?i)8443/v1/'''
+          ]
           TOML
           : > "$RUNNER_TEMP/empty.gitleaksignore"
 
