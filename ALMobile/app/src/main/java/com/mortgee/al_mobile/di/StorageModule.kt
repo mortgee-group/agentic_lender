@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.mortgee.al_mobile.BuildConfig
 import com.mortgee.al_mobile.data.session.CompletedSessionStorage
+import com.mortgee.al_mobile.data.session.DefaultUserPrivateStore
 import com.mortgee.al_mobile.data.session.SharedPreferencesCompletedSessionStorage
+import com.mortgee.al_mobile.data.session.UserPrivateStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,6 +32,14 @@ object StorageModule {
     fun provideCompletedSessionStorage(
         impl: SharedPreferencesCompletedSessionStorage
     ): CompletedSessionStorage {
+        return impl
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserPrivateStore(
+        impl: DefaultUserPrivateStore
+    ): UserPrivateStore {
         return impl
     }
 }
