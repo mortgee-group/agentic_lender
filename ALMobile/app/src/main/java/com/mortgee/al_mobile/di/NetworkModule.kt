@@ -12,6 +12,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import javax.inject.Singleton
 import com.mortgee.al_mobile.data.network.CatalogueApiService
+import com.mortgee.al_mobile.data.network.ProfileApiService
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -51,5 +52,13 @@ object NetworkModule {
         retrofit: Retrofit
     ): CatalogueApiService {
         return retrofit.create(CatalogueApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideProfileApiService(
+        retrofit: Retrofit
+    ): ProfileApiService {
+        return retrofit.create(ProfileApiService::class.java)
     }
 }
