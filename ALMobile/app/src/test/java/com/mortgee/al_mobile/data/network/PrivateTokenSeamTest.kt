@@ -160,19 +160,19 @@ class PrivateTokenSeamTest {
 
     @Test
     fun `isAllowedOrigin correctly validates origin and scheme`() {
-        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://api.example.com:8443/")
+        val seam = DefaultPrivateTokenSeam(sessionOwner, fakeAuthAdapter, "https://gateway.example.org:9443/")
 
-        assertTrue(seam.isAllowedOrigin("https://api.example.com:8443/v1/properties"))
-        assertTrue(seam.isAllowedOrigin("https://API.EXAMPLE.COM:8443/v1/users/me"))
+        assertTrue(seam.isAllowedOrigin("https://gateway.example.org:9443/v1/properties"))
+        assertTrue(seam.isAllowedOrigin("https://GATEWAY.EXAMPLE.ORG:9443/v1/users/me"))
 
         // HTTP scheme forbidden
-        assertFalse(seam.isAllowedOrigin("http://api.example.com:8443/v1/properties"))
+        assertFalse(seam.isAllowedOrigin("http://gateway.example.org:9443/v1/properties"))
 
         // Different host forbidden
-        assertFalse(seam.isAllowedOrigin("https://untrusted-api.com:8443/v1/properties"))
+        assertFalse(seam.isAllowedOrigin("https://untrusted.example.org:9443/v1/properties"))
 
         // Different port forbidden
-        assertFalse(seam.isAllowedOrigin("https://api.example.com:443/v1/properties"))
+        assertFalse(seam.isAllowedOrigin("https://gateway.example.org:443/v1/properties"))
 
         // Invalid URL
         assertFalse(seam.isAllowedOrigin("invalid-url-string"))
