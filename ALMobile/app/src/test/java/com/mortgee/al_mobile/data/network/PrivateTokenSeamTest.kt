@@ -479,6 +479,9 @@ class PrivateTokenSeamTest {
     }
 
     private class FakeAuthAdapter : AuthAdapter {
+        var sdkUid: String? = null
+        override val currentUid: String?
+            get() = sdkUid
         var tokenResult: Result<String> = Result.success("default_test_token")
         var customTokenHandler: (suspend (uid: String, forceRefresh: Boolean) -> Result<String>)? = null
         val tokenRequests = mutableListOf<Pair<String, Boolean>>()

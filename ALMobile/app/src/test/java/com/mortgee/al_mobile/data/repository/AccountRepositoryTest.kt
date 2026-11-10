@@ -18,6 +18,8 @@ class AccountRepositoryTest {
                     SignInResult.InvalidCredentials
                 }
             }
+
+            override suspend fun restoreSession(): SignInResult = SignInResult.Success
         }
 
         assertEquals(
@@ -36,6 +38,8 @@ class AccountRepositoryTest {
             override suspend fun signIn(email: String, password: String): SignInResult {
                 throw CancellationException("Sign in cancelled")
             }
+
+            override suspend fun restoreSession(): SignInResult = SignInResult.Success
         }
 
         fakeRepository.signIn("test@example.com", "password")

@@ -10,6 +10,11 @@ import com.mortgee.al_mobile.data.model.SignInResult
  */
 interface AuthAdapter {
     /**
+     * The UID of the currently signed-in SDK user, or null if no SDK user is signed in.
+     */
+    val currentUid: String?
+
+    /**
      * Signs in with email and password credentials using the Firebase Authentication SDK.
      *
      * @param email User email credential.

@@ -13,4 +13,14 @@ interface AccountRepository {
      * Propagates [kotlinx.coroutines.CancellationException] if cancelled.
      */
     suspend fun signIn(email: String, password: String): SignInResult
+
+    /**
+     * Attempts session restoration for a process using stored completed session marker.
+     *
+     * Runs restore once per process through the same gate and validation path as sign-in.
+     *
+     * Returns a safe [SignInResult] indicating the outcome.
+     * Propagates [kotlinx.coroutines.CancellationException] if cancelled.
+     */
+    suspend fun restoreSession(): SignInResult
 }

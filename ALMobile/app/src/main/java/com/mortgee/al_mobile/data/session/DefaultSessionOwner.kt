@@ -36,6 +36,7 @@ class DefaultSessionOwner @Inject constructor(
     override suspend fun startSignInAttempt(): SessionAttempt? {
         return gateMutex.withLock {
             if (_sessionState.value !is SessionState.SignedOut) return@withLock null
+            storage.clearCompletedUid()
             val attempt = SessionAttempt(UUID.randomUUID().toString(), SessionAttempt.Type.SIGN_IN)
             activeAttempt = attempt
             _sessionState.value = SessionState.Establishing(attempt.attemptId)

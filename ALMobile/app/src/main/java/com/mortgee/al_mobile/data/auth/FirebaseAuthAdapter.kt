@@ -26,6 +26,9 @@ class FirebaseAuthAdapter(
     private val firebaseAuth: FirebaseAuth
 ) : AuthAdapter {
 
+    override val currentUid: String?
+        get() = firebaseAuth.currentUser?.uid
+
     private val mutationMutex = Mutex()
 
     override suspend fun signIn(email: String, password: String): AuthResult {

@@ -34,6 +34,8 @@ class AuthAdapterTest {
     private class FakeAuthAdapter : AuthAdapter {
         private val mutationMutex = Mutex()
         var currentUserUid: String? = null
+        override val currentUid: String?
+            get() = currentUserUid
         var currentUserEmail: String? = null
         var signInException: Exception? = null
         var tokenToReturn: String = "token_abc_123"

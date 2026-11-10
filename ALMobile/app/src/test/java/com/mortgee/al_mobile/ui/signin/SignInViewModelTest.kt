@@ -184,5 +184,7 @@ class SignInViewModelTest {
             lastSubmittedPassword = password
             return resultToReturn
         }
+
+        override suspend fun restoreSession(): SignInResult = resultToReturn
     }
 }

@@ -4,6 +4,7 @@ import com.mortgee.al_mobile.data.auth.AuthAdapter
 import com.mortgee.al_mobile.data.auth.AuthResult
 import com.mortgee.al_mobile.data.model.SignInResult
 import com.mortgee.al_mobile.data.network.ProfileApiService
+import com.mortgee.al_mobile.data.session.CompletedSessionStorage
 import com.mortgee.al_mobile.data.session.SessionOwner
 import com.mortgee.al_mobile.data.session.UserPartitionManager
 import kotlinx.coroutines.CancellationException
@@ -24,6 +25,7 @@ class ApiAccountRepository @Inject constructor(
     private val profileApiService: ProfileApiService,
     private val sessionOwner: SessionOwner,
     private val userPartitionManager: UserPartitionManager,
+    private val completedSessionStorage: CompletedSessionStorage,
 ) : AccountRepository {
 
     override suspend fun signIn(email: String, password: String): SignInResult {
@@ -95,5 +97,95 @@ class ApiAccountRepository @Inject constructor(
             sessionOwner.cancelAttempt(attempt)
             SignInResult.GenericFailure
         }
+    }
+
+    override suspend fun restoreSession(): SignInResult {
+        val attempt = sessionOwner.startRestoreAttempt() ?: return SignInResult.Busy
+
+        val completedUid = completedSessionStorage.getCompletedUid()
+        if (completedUid.isNullOrBlank()) {
+            sessionOwner.cancelAttempt(attempt)
+            return SignInResult.GenericFailure
+        }
+
+        return try {
+            val currentSdkUid = authAdapter.currentUid
+            if (currentSdkUid.isNullOrBlank() || currentSdkUid != completedUid) {
+                sessionOwner.invalidateSession()
+                return SignInResult.RejectedAuthentication
+            }
+
+            val tokenResult = authAdapter.getToken(completedUid, forceRefresh = false)
+            if (tokenResult.isFailure) {
+                val exception = tokenResult.exceptionOrNull()
+                if (exception is IOException || isNetworkException(exception)) {
+                    sessionOwner.cancelAttempt(attempt)
+                    return SignInResult.Connectivity
+                } else {
+                    sessionOwner.invalidateSession()
+                    return SignInResult.RejectedAuthentication
+                }
+            }
+            val token = tokenResult.getOrThrow()
+
+            val profile = try {
+                profileApiService.getProfile("Bearer $token")
+            } catch (e: HttpException) {
+                sessionOwner.invalidateSession()
+                return when (e.code()) {
+                    401, 403 -> SignInResult.RejectedAuthentication
+                    404 -> SignInResult.MissingProfile
+                    else -> SignInResult.GenericFailure
+                }
+            } catch (_: IOException) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.Connectivity
+            }
+
+            if (profile.uid != completedUid) {
+                sessionOwner.invalidateSession()
+                return SignInResult.RejectedAuthentication
+            }
+
+            val role = profile.decodeRole()
+            if (role == null) {
+                sessionOwner.invalidateSession()
+                return SignInResult.UnsupportedRole
+            }
+
+            val partitionReady = userPartitionManager.preparePartition(completedUid)
+            if (!partitionReady) {
+                sessionOwner.invalidateSession()
+                return SignInResult.GenericFailure
+            }
+
+            val committed = sessionOwner.commitSession(
+                attempt = attempt,
+                uid = completedUid,
+                email = profile.email,
+                role = role,
+                displayName = profile.displayName,
+            )
+
+            if (committed) {
+                SignInResult.Success
+            } else {
+                sessionOwner.invalidateSession()
+                SignInResult.GenericFailure
+            }
+        } catch (e: CancellationException) {
+            sessionOwner.cancelAttempt(attempt)
+            throw e
+        } catch (_: Exception) {
+            sessionOwner.invalidateSession()
+            SignInResult.GenericFailure
+        }
+    }
+
+    private fun isNetworkException(e: Throwable?): Boolean {
+        if (e == null) return false
+        if (e is IOException) return true
+        val msg = e.message?.lowercase() ?: ""
+        return msg.contains("network") || msg.contains("connection") || msg.contains("unreachable")
     }
 }

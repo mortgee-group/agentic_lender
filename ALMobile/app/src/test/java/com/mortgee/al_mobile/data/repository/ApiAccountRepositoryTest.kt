@@ -45,6 +45,7 @@ class ApiAccountRepositoryTest {
             profileApiService = fakeProfileApiService,
             sessionOwner = sessionOwner,
             userPartitionManager = fakePartitionManager,
+            completedSessionStorage = fakeStorage,
         )
     }
 
@@ -419,6 +420,140 @@ class ApiAccountRepositoryTest {
         assertEquals(signOutCountBefore, fakeAuthAdapter.signOutCount)
     }
 
+    @Test
+    fun `restoreSession returns GenericFailure when no stored marker exists`() = runTest {
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.GenericFailure, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+    }
+
+    @Test
+    fun `restoreSession restores session when SDK UID matches marker and profile succeeds`() = runTest {
+        val uid = "restored-uid-123"
+        fakeStorage.saveCompletedUid(uid)
+        fakeAuthAdapter.sdkUid = uid
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = uid,
+            email = "restored@example.com",
+            role = "broker",
+            displayName = "Restored Broker"
+        )
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.Success, result)
+        val state = sessionOwner.sessionState.value
+        assertTrue(state is SessionState.Authenticated)
+        val authState = state as SessionState.Authenticated
+        assertEquals(uid, authState.uid)
+        assertEquals("restored@example.com", authState.email)
+        assertEquals(BackendRole.BROKER, authState.role)
+        assertEquals("Restored Broker", authState.displayName)
+    }
+
+    @Test
+    fun `restoreSession returns RejectedAuthentication and clears marker when SDK UID mismatches marker`() = runTest {
+        val storedUid = "stored-uid-123"
+        fakeStorage.saveCompletedUid(storedUid)
+        fakeAuthAdapter.sdkUid = "different-sdk-uid-456"
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.RejectedAuthentication, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `restoreSession handles transient offline restore keeping marker and closing private content`() = runTest {
+        val uid = "offline-uid-123"
+        fakeStorage.saveCompletedUid(uid)
+        fakeAuthAdapter.sdkUid = uid
+        fakeProfileApiService.exceptionToThrow = IOException("No internet connection")
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.Connectivity, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(uid, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `restoreSession handles terminal invalid profile 401 by clearing marker and reconciling auth`() = runTest {
+        val uid = "invalid-profile-uid"
+        fakeStorage.saveCompletedUid(uid)
+        fakeAuthAdapter.sdkUid = uid
+        fakeProfileApiService.exceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(401, "".toResponseBody(null))
+        )
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.RejectedAuthentication, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `restoreSession handles terminal invalid profile 404 by clearing marker and reconciling auth`() = runTest {
+        val uid = "missing-profile-uid"
+        fakeStorage.saveCompletedUid(uid)
+        fakeAuthAdapter.sdkUid = uid
+        fakeProfileApiService.exceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, "".toResponseBody(null))
+        )
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.MissingProfile, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `restoreSession handles terminal unsupported role by clearing marker and reconciling auth`() = runTest {
+        val uid = "bad-role-uid"
+        fakeStorage.saveCompletedUid(uid)
+        fakeAuthAdapter.sdkUid = uid
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = uid,
+            email = "badrole@example.com",
+            role = "unsupported_admin_role"
+        )
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.UnsupportedRole, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `restoreSession returns Busy when another attempt is already active`() = runTest {
+        fakeStorage.saveCompletedUid("some-uid")
+        fakeAuthAdapter.sdkUid = "some-uid"
+
+        val attempt = sessionOwner.startSignInAttempt()
+        assertTrue(attempt != null)
+
+        val result = repository.restoreSession()
+
+        assertEquals(SignInResult.Busy, result)
+    }
+
+    @Test
+    fun `startSignInAttempt clears old completed marker before starting new credential sign-in`() = runTest {
+        fakeStorage.saveCompletedUid("old-uid-999")
+        assertEquals("old-uid-999", fakeStorage.getCompletedUid())
+
+        val attempt = sessionOwner.startSignInAttempt()
+        assertTrue(attempt != null)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
@@ -429,15 +564,29 @@ class ApiAccountRepositoryTest {
     }
 
     private class FakeAuthAdapter : AuthAdapter {
+        var sdkUid: String? = null
+        override val currentUid: String?
+            get() = sdkUid
         var signInResult: AuthResult = AuthResult.Failure(SignInResult.InvalidCredentials)
         var signOutCount: Int = 0
 
-        override suspend fun signIn(email: String, password: String): AuthResult = signInResult
+        override suspend fun signIn(email: String, password: String): AuthResult {
+            val result = signInResult
+            if (result is AuthResult.Success) {
+                sdkUid = result.user.uid
+            }
+            return result
+        }
 
-        override suspend fun getToken(uid: String, forceRefresh: Boolean): Result<String> =
-            Result.success("test-token")
+        override suspend fun getToken(uid: String, forceRefresh: Boolean): Result<String> {
+            if (sdkUid == null || sdkUid != uid) {
+                return Result.failure(IllegalStateException("Current SDK user missing or UID mismatch"))
+            }
+            return Result.success("test-token")
+        }
 
         override suspend fun signOut(): Boolean {
+            sdkUid = null
             signOutCount++
             return true
         }
