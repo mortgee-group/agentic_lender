@@ -1,5 +1,7 @@
 package com.mortgee.al_mobile.di
 
+import com.mortgee.al_mobile.data.repository.AccountRepository
+import com.mortgee.al_mobile.data.repository.ApiAccountRepository
 import com.mortgee.al_mobile.data.repository.ApiCatalogueRepository
 import com.mortgee.al_mobile.data.repository.CatalogueRepository
 import dagger.Binds
@@ -17,4 +19,10 @@ abstract class RepositoryModule {
     abstract fun bindCatalogueRepository(
         impl: ApiCatalogueRepository
     ): CatalogueRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountRepository(
+        impl: ApiAccountRepository
+    ): AccountRepository
 }
