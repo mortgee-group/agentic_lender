@@ -46,7 +46,7 @@ class SessionStateTest {
             uid = "user_789",
             email = "borrower@example.com",
             role = BackendRole.BORROWER,
-            displayName = "Jane Borrower"
+            displayName = "Jane Borrower",
         )
 
         assertTrue(state.isAuthenticated)

@@ -16,7 +16,7 @@ import java.util.UUID
 class SessionOwnerContractTest {
 
     private class FakeSessionOwner(
-        private val storage: CompletedSessionStorage
+        private val storage: CompletedSessionStorage,
     ) : SessionOwner {
 
         private val _sessionState = MutableStateFlow<SessionState>(SessionState.SignedOut)

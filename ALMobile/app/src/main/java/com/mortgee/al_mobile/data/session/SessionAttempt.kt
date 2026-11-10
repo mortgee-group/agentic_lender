@@ -8,10 +8,10 @@ package com.mortgee.al_mobile.data.session
  */
 data class SessionAttempt(
     val attemptId: String,
-    val type: Type
+    val type: Type,
 ) {
     enum class Type {
         SIGN_IN,
-        RESTORE
+        RESTORE,
     }
 }
