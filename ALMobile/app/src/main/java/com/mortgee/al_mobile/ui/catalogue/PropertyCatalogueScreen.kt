@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
@@ -52,6 +53,7 @@ fun PropertyCatalogueScreen(
     onPropertyClick: (String) -> Unit = {},
     isTestFeatureEnabled: Boolean = false,
     onTestFeatureClick: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
     onRetry: () -> Unit = {}
 ) {
     Scaffold(
@@ -64,6 +66,14 @@ fun PropertyCatalogueScreen(
                             Icon(
                                 imageVector = Icons.Default.Build,
                                 contentDescription = "Test Feature Playground"
+                            )
+                        }
+                    }
+                    if (onSignOut != null) {
+                        IconButton(onClick = onSignOut) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Sign Out"
                             )
                         }
                     }

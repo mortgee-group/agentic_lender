@@ -10,6 +10,7 @@ fun PropertyCatalogueRoute(
     onPropertyClick: (String) -> Unit = {},
     isTestFeatureEnabled: Boolean = false,
     onTestFeatureClick: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
     viewModel: PropertyCatalogueViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -19,6 +20,7 @@ fun PropertyCatalogueRoute(
         onPropertyClick = onPropertyClick,
         isTestFeatureEnabled = isTestFeatureEnabled,
         onTestFeatureClick = onTestFeatureClick,
+        onSignOut = onSignOut,
         onRetry = { viewModel.loadProperties() }
     )
 }
