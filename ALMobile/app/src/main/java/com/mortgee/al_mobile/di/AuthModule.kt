@@ -22,7 +22,7 @@ object AuthModule {
     @Provides
     @Singleton
     fun provideAuthAdapter(
-        firebaseAuth: FirebaseAuth
+        firebaseAuth: FirebaseAuth,
     ): AuthAdapter {
         return FirebaseAuthAdapter(firebaseAuth)
     }

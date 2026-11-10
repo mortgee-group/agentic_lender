@@ -35,7 +35,7 @@ object NetworkModule {
     @Singleton
     fun providePrivateTokenSeam(
         sessionOwner: SessionOwner,
-        authAdapter: AuthAdapter
+        authAdapter: AuthAdapter,
     ): PrivateTokenSeam {
         return DefaultPrivateTokenSeam(
             sessionOwner = sessionOwner,

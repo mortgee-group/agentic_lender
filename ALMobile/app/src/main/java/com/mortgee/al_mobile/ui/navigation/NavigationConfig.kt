@@ -14,18 +14,17 @@ object NavigationConfig {
     var ENABLE_TEST_FEATURE: Boolean = true
 
     /**
-     * Explicit table mapping supported backend roles to existing destinations for the MVP.
-     * MVP Decision: Application is borrower only for MVP.
-     * - [BackendRole.BORROWER] maps to [NavDestination.PropertyCatalogue].
-     * - [BackendRole.BROKER] and [BackendRole.UNDERWRITER] have no private destination in MVP.
-     * - Unknown roles and null have no private destination and do not fall back to Borrower.
-     * - Owner and Provider have no approved backend mapping.
+     * Shared destination policy for Task 03.
+     * Maps all three supported backend roles ([BackendRole.BORROWER], [BackendRole.BROKER], [BackendRole.UNDERWRITER])
+     * to [NavDestination.AuthenticatedLanding].
+     * Missing or unknown roles return null (no private destination).
+     * Owner and Provider have no approved backend mapping.
      */
     fun getDestinationForRole(role: BackendRole?): NavDestination? {
         return when (role) {
-            BackendRole.BORROWER -> NavDestination.PropertyCatalogue
+            BackendRole.BORROWER,
             BackendRole.BROKER,
-            BackendRole.UNDERWRITER -> null
+            BackendRole.UNDERWRITER -> NavDestination.AuthenticatedLanding
             null -> null
         }
     }
@@ -35,6 +34,7 @@ object NavigationConfig {
  * Navigation destinations for the ALMobile app.
  */
 sealed interface NavDestination {
+    data object AuthenticatedLanding : NavDestination
     data object PropertyCatalogue : NavDestination
     data class PropertyDetail(val propertyId: String) : NavDestination
     data object TestFeature : NavDestination

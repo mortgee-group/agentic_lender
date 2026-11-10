@@ -19,7 +19,7 @@ abstract class SessionModule {
     @Binds
     @Singleton
     abstract fun bindSessionOwner(
-        impl: DefaultSessionOwner
+        impl: DefaultSessionOwner,
     ): SessionOwner
 
     @Binds

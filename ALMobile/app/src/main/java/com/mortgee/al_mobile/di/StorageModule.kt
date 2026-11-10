@@ -21,7 +21,7 @@ object StorageModule {
     @Provides
     @Singleton
     fun provideSharedPreferences(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
     ): SharedPreferences {
         val storageName = SharedPreferencesCompletedSessionStorage.getStorageName(BuildConfig.API_BASE_URL)
         return context.getSharedPreferences(storageName, Context.MODE_PRIVATE)

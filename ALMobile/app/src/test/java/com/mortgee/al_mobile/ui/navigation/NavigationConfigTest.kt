@@ -27,22 +27,22 @@ class NavigationConfigTest {
         val catalogue = NavDestination.PropertyCatalogue
         val detail = NavDestination.PropertyDetail("item_123")
         val testFeature = NavDestination.TestFeature
+        val landing = NavDestination.AuthenticatedLanding
 
         assertTrue(catalogue is NavDestination.PropertyCatalogue)
         assertEquals("item_123", (detail as NavDestination.PropertyDetail).propertyId)
         assertTrue(testFeature is NavDestination.TestFeature)
+        assertTrue(landing is NavDestination.AuthenticatedLanding)
     }
 
     @Test
-    fun `getDestinationForRole maps borrower to PropertyCatalogue and others to null without fallback`() {
-        // Borrower maps to PropertyCatalogue
-        assertEquals(NavDestination.PropertyCatalogue, NavigationConfig.getDestinationForRole(BackendRole.BORROWER))
+    fun `getDestinationForRole maps all supported roles to AuthenticatedLanding and unknown to null`() {
+        // Borrower, Broker, and Underwriter map to AuthenticatedLanding
+        assertEquals(NavDestination.AuthenticatedLanding, NavigationConfig.getDestinationForRole(BackendRole.BORROWER))
+        assertEquals(NavDestination.AuthenticatedLanding, NavigationConfig.getDestinationForRole(BackendRole.BROKER))
+        assertEquals(NavDestination.AuthenticatedLanding, NavigationConfig.getDestinationForRole(BackendRole.UNDERWRITER))
 
-        // Broker and Underwriter have no private destination in MVP (returns null, no fallback to borrower)
-        assertNull(NavigationConfig.getDestinationForRole(BackendRole.BROKER))
-        assertNull(NavigationConfig.getDestinationForRole(BackendRole.UNDERWRITER))
-
-        // Unknown / null role has no private destination and does not fall back to borrower
+        // Unknown / null role has no private destination
         assertNull(NavigationConfig.getDestinationForRole(null))
         val parsedUnknown = BackendRole.fromValue("unknown_role")
         assertNull(NavigationConfig.getDestinationForRole(parsedOwnerOrProvider(parsedUnknown)))

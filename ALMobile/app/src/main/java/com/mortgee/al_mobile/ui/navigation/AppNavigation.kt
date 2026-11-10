@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.mortgee.al_mobile.ui.catalogue.PropertyCatalogueRoute
 import com.mortgee.al_mobile.ui.detail.PropertyDetailRoute
+import com.mortgee.al_mobile.ui.landing.AuthenticatedLandingRoute
 import com.mortgee.al_mobile.ui.testfeature.TestFeatureRoute
 
 @Composable
@@ -18,6 +19,13 @@ fun AppNavigation(
     var currentDestination by remember { mutableStateOf<NavDestination>(NavDestination.PropertyCatalogue) }
 
     when (val destination = currentDestination) {
+        is NavDestination.AuthenticatedLanding -> {
+            AuthenticatedLandingRoute(
+                onSignOut = {
+                    currentDestination = NavDestination.PropertyCatalogue
+                }
+            )
+        }
         is NavDestination.PropertyCatalogue -> {
             PropertyCatalogueRoute(
                 onPropertyClick = { propertyId ->
