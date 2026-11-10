@@ -11,8 +11,13 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import javax.inject.Singleton
+import com.mortgee.al_mobile.data.auth.AuthAdapter
 import com.mortgee.al_mobile.data.network.CatalogueApiService
+import com.mortgee.al_mobile.data.network.DefaultPrivateTokenSeam
+import com.mortgee.al_mobile.data.network.PrivateRequestInterceptor
+import com.mortgee.al_mobile.data.network.PrivateTokenSeam
 import com.mortgee.al_mobile.data.network.ProfileApiService
+import com.mortgee.al_mobile.data.session.SessionOwner
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -28,8 +33,33 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun providePrivateTokenSeam(
+        sessionOwner: SessionOwner,
+        authAdapter: AuthAdapter
+    ): PrivateTokenSeam {
+        return DefaultPrivateTokenSeam(
+            sessionOwner = sessionOwner,
+            authAdapter = authAdapter,
+            baseUrlString = BuildConfig.API_BASE_URL
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun providePrivateRequestInterceptor(
+        privateTokenSeam: PrivateTokenSeam
+    ): PrivateRequestInterceptor {
+        return PrivateRequestInterceptor(privateTokenSeam)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        privateRequestInterceptor: PrivateRequestInterceptor
+    ): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(privateRequestInterceptor)
+            .addNetworkInterceptor(privateRequestInterceptor)
             .build()
     }
 

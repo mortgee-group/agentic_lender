@@ -236,6 +236,189 @@ class ApiAccountRepositoryTest {
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
     }
 
+    @Test
+    fun `profile 404 failure cleans up attempt via session owner and allows fresh submit retry`() = runTest {
+        val candidateUid = "user-uid-123"
+        val candidateEmail = "borrower@example.com"
+        val initialSignOutCount = fakeAuthAdapter.signOutCount
+
+        // 1st attempt fails with 404
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.exceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, "".toResponseBody(null))
+        )
+
+        val firstResult = repository.signIn(candidateEmail, "password")
+        assertEquals(SignInResult.MissingProfile, firstResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertTrue(fakeAuthAdapter.signOutCount > initialSignOutCount)
+
+        // Fresh submit retry succeeds
+        fakeProfileApiService.exceptionToThrow = null
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = "Test Borrower"
+        )
+
+        val retryResult = repository.signIn(candidateEmail, "password")
+        assertEquals(SignInResult.Success, retryResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.Authenticated)
+    }
+
+    @Test
+    fun `UID mismatch failure cleans up attempt via session owner and allows fresh submit retry`() = runTest {
+        val candidateUid = "candidate-uid-111"
+        val mismatchUid = "different-profile-uid-222"
+        val email = "user@example.com"
+        val initialSignOutCount = fakeAuthAdapter.signOutCount
+
+        // 1st attempt fails with UID mismatch
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = email)
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = mismatchUid,
+            email = email,
+            role = "underwriter"
+        )
+
+        val firstResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.RejectedAuthentication, firstResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertTrue(fakeAuthAdapter.signOutCount > initialSignOutCount)
+
+        // Fresh submit retry with matching UID succeeds
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = email,
+            role = "underwriter"
+        )
+
+        val retryResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.Success, retryResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.Authenticated)
+    }
+
+    @Test
+    fun `unsupported role failure cleans up attempt via session owner and allows fresh submit retry`() = runTest {
+        val candidateUid = "user-uid-123"
+        val email = "user@example.com"
+        val initialSignOutCount = fakeAuthAdapter.signOutCount
+
+        // 1st attempt fails with unknown role
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = email)
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = email,
+            role = "invalid_role"
+        )
+
+        val firstResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.UnsupportedRole, firstResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertTrue(fakeAuthAdapter.signOutCount > initialSignOutCount)
+
+        // Fresh submit retry with supported role succeeds
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = email,
+            role = "broker"
+        )
+
+        val retryResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.Success, retryResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.Authenticated)
+    }
+
+    @Test
+    fun `transport failure cleans up attempt via session owner and allows fresh submit retry`() = runTest {
+        val candidateUid = "user-uid-123"
+        val email = "user@example.com"
+        val initialSignOutCount = fakeAuthAdapter.signOutCount
+
+        // 1st attempt fails with IOException
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = email)
+        )
+        fakeProfileApiService.exceptionToThrow = IOException("Connection reset")
+
+        val firstResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.Connectivity, firstResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertTrue(fakeAuthAdapter.signOutCount > initialSignOutCount)
+
+        // Fresh submit retry after network returns succeeds
+        fakeProfileApiService.exceptionToThrow = null
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = email,
+            role = "borrower"
+        )
+
+        val retryResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.Success, retryResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.Authenticated)
+    }
+
+    @Test
+    fun `partition setup failure cleans up attempt via session owner and allows fresh submit retry`() = runTest {
+        val candidateUid = "user-uid-123"
+        val email = "user@example.com"
+        val initialSignOutCount = fakeAuthAdapter.signOutCount
+
+        // 1st attempt fails when partition setup fails
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = email)
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = email,
+            role = "broker"
+        )
+        fakePartitionManager.shouldSucceed = false
+
+        val firstResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.GenericFailure, firstResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertTrue(fakeAuthAdapter.signOutCount > initialSignOutCount)
+
+        // Fresh submit retry after partition setup succeeds
+        fakePartitionManager.shouldSucceed = true
+
+        val retryResult = repository.signIn(email, "password")
+        assertEquals(SignInResult.Success, retryResult)
+        assertTrue(sessionOwner.sessionState.value is SessionState.Authenticated)
+    }
+
+    @Test
+    fun `an old failure cleans up only its own attempt and leaves newer attempt active`() = runTest {
+        val oldAttempt = sessionOwner.startSignInAttempt()
+        assertTrue(oldAttempt != null)
+
+        sessionOwner.cancelAttempt(oldAttempt!!)
+
+        val newAttempt = sessionOwner.startSignInAttempt()
+        assertTrue(newAttempt != null)
+        val currentStateBefore = sessionOwner.sessionState.value
+        assertTrue(currentStateBefore is SessionState.Establishing)
+        assertEquals(newAttempt?.attemptId, (currentStateBefore as SessionState.Establishing).attemptId)
+
+        val signOutCountBefore = fakeAuthAdapter.signOutCount
+
+        sessionOwner.cancelAttempt(oldAttempt)
+
+        val currentStateAfter = sessionOwner.sessionState.value
+        assertTrue(currentStateAfter is SessionState.Establishing)
+        assertEquals(newAttempt?.attemptId, (currentStateAfter as SessionState.Establishing).attemptId)
+        assertEquals(signOutCountBefore, fakeAuthAdapter.signOutCount)
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
@@ -247,13 +430,17 @@ class ApiAccountRepositoryTest {
 
     private class FakeAuthAdapter : AuthAdapter {
         var signInResult: AuthResult = AuthResult.Failure(SignInResult.InvalidCredentials)
+        var signOutCount: Int = 0
 
         override suspend fun signIn(email: String, password: String): AuthResult = signInResult
 
         override suspend fun getToken(uid: String, forceRefresh: Boolean): Result<String> =
             Result.success("test-token")
 
-        override suspend fun signOut(): Boolean = true
+        override suspend fun signOut(): Boolean {
+            signOutCount++
+            return true
+        }
     }
 
     private class FakeProfileApiService : ProfileApiService {
