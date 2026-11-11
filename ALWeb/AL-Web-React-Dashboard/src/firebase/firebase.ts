@@ -4,8 +4,8 @@ import { getAuth, type Auth } from "firebase/auth";
 /**
  * Firebase Web SDK setup for AL-Web.
  *
- * Keep using the existing local demo login until the Firebase Authentication
- * integration has been implemented and tested. VITE_ values are embedded in
+ * Firebase Authentication is enabled for three fictional test accounts.
+ * VITE_ values are embedded in
  * the browser bundle and must never contain private server credentials.
  */
 function configFromEnvironment(): FirebaseOptions {
@@ -36,7 +36,7 @@ export function getFirebaseApp(): FirebaseApp {
  return getApps().length ? getApp() : initializeApp(configFromEnvironment());
 }
 
-/** Future Firebase login code should obtain the Auth instance from here. */
+/** Return the shared Firebase Auth instance. */
 export function getFirebaseAuth(): Auth {
  return getAuth(getFirebaseApp());
 }

@@ -14,29 +14,41 @@ React + TypeScript + Vite portal for **borrowers, mortgage brokers and bank unde
 
 Earlier valuation form/results components remain in source for possible reuse, but are no longer linked to the active portal.
 
-## Run locally
+## Run locally (Firebase Authentication test users)
 
-From this folder:
+Install Node.js 24.12.0+ (or Node.js 26), then from this folder:
 
 ```powershell
 npm ci
 npm run build
-npm run dev:all
+npm run dev
 ```
 
-Open http://localhost:5173. `dev:all` starts Vite and the local Node demo authentication service.
+Open http://localhost:5173. The active login uses **Firebase Authentication**;
+the local Node demo login server is no longer used. You do not need `npm run dev:all`.
+To check AL-Core status, separately run FastAPI on http://127.0.0.1:8000 and set
+`VITE_API_BASE_URL=http://127.0.0.1:8000` in the ignored `.env.local`.
 
-Create an ignored `server/users.txt` with **fictional test-only credentials** if it does not exist:
+Copy `.env.example` to `.env.local` and fill in the Firebase Web SDK configuration
+from the shared `agentic-lender-8ad70` project. Restart Vite after editing env vars.
 
-```text
-borrower-test:BorrowerDemo123!
-ed:Demo1234!
-student:College2026!
-```
+Firebase Console must have Email/Password sign-in enabled. Three manually created
+fictional test users are recognised by the UI:
+- `borrower@test.agenticlender.ie` -> borrower demo profile `borrower-test`
+- `broker@test.agenticlender.ie` -> broker demo profile `ed`
+- `underwriter@test.agenticlender.ie` -> underwriter demo profile `student`
 
-`server/demo-roles.json` maps `borrower-test` to Borrower, `ed` to Broker and `student` to Underwriter. Role mapping is not secure or production-ready. Sessions are ephemeral and credentials are stored locally in plain text. Never use real passwords or deploy this authentication service.
+Use the passwords configured in Firebase Console, **not** the old local demo
+passwords. Login, refresh the page to confirm persistence, log out, then sign
+in using each role. The existing `server/users.txt` and `server/demo-roles.json`
+are legacy demo server fixtures and are not used by the current Web login.
 
-To check AL-Core status, run FastAPI on http://127.0.0.1:8000 and put `VITE_API_BASE_URL=http://127.0.0.1:8000` into ignored `.env.local`.
+**Important**: Role assignment is a hardcoded frontend allowlist solely for UI
+testing, not a security mechanism. All loan applications remain fictional and
+bundled in the browser code. Do not connect protected data based on this role
+mapping. Authorised access must be enforced by verified Firebase ID tokens,
+trusted role claims / profile provisioning, Firestore security rules and AL-Core.
+Do not introduce public self-registration for privileged roles.
 
 ## Integration limitations
 
@@ -48,24 +60,13 @@ To check AL-Core status, run FastAPI on http://127.0.0.1:8000 and put `VITE_API_
 
 See `STAGE3-TESTING.md` for the acceptance checklist.
 
-## Firebase SDK preparation (not yet live authentication)
+## Firebase Authentication integration
 
-Nikoll registered AL-Web in the Firebase project `agentic-lender-8ad70`.
-The app provides `src/firebase/firebase.ts` with lazy Firebase app/Auth initialisation, but
-the active login still uses the **local demonstration server**.
+The modular Firebase SDK is initialized in `src/firebase/firebase.ts` on demand.
+`src/services/auth.ts` uses `signInWithEmailAndPassword`, `authStateReady`,
+and `signOut`. The browser's Firebase persistence restores sessions after refresh.
+Only three known demo emails receive a local display role. All other Firebase
+users are denied access to the prototype portal screens, even if their Firebase
+credentials are valid. The next milestone is trusted backend role resolution
+and secured profile/application access.
 
-1. In this directory run `npm install firebase`. This updates both `package.json` and
-   `package-lock.json`; commit **both files together**.
-2. Copy `.env.example` to `.env.local` and populate the empty values from the exact
-   Firebase Web SDK configuration received from Nikoll. Do not manually change
-   the Firebase project's `apiKey` or `appId`.
-3. Run `npm run build` and `npm run dev:all`. Verify existing three-role demo login.
-4. For a configuration-only check, temporarily import `getFirebaseApp` from
-   `./firebase/firebase` in `src/main.tsx` and run `console.log(getFirebaseApp().options.projectId)`,
-   then remove the temporary test before committing. Firebase SDK initialization does
-   **not** confirm that user authentication or Firestore permissions work.
-
-Vite exposes `VITE_*` variables to browser code. They are not secrets.
-Private service-account keys must never be used in the frontend.
-Do not run `npm ci` after adding an unsynchronised dependency to `package.json`;
-commit the npm-generated lockfile first. The real auth migration will be a separate change.
