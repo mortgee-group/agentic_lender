@@ -48,7 +48,7 @@ testing, not a security mechanism. All loan applications remain fictional and
 bundled in the browser code. Do not connect protected data based on this role
 mapping. Authorised access must be enforced by verified Firebase ID tokens,
 trusted role claims / profile provisioning, Firestore security rules and AL-Core.
-Do not introduce public self-registration for privileged roles.
+The Register tab is a temporary *development-only* self-registration pathway. It creates a real Firebase Authentication user, but stores the selected role only in this browser's localStorage under the Firebase UID. It does not grant Firebase custom claims or database/API permissions. Disable or restrict registration before public deployment.
 
 ## Integration limitations
 
@@ -68,5 +68,5 @@ and `signOut`. The browser's Firebase persistence restores sessions after refres
 Only three known demo emails receive a local display role. All other Firebase
 users are denied access to the prototype portal screens, even if their Firebase
 credentials are valid. The next milestone is trusted backend role resolution
-and secured profile/application access.
+and secured profile/application access.\n\n### Registration test\n\n1. In the login screen select **Register**. Enter a fresh fictional email and password, confirm the password, and choose Borrower, Broker, or Underwriter.\n2. Submit. Firebase creates a real Authentication user; the role changes only the demo dashboard.\n3. Refresh, sign out and sign back in on the same browser. Check the chosen dashboard is restored.\n4. Verify the new user appears in Firebase Console > Authentication > Users.\n5. Repeat for all roles using distinct test emails; existing three test accounts should still work.\n6. Do not use this demo role for AL-Core authorization or Firestore security rules.\n
 
