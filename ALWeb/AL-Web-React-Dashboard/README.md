@@ -47,3 +47,25 @@ To check AL-Core status, run FastAPI on http://127.0.0.1:8000 and put `VITE_API_
 - Do not use this prototype to make real lending decisions.
 
 See `STAGE3-TESTING.md` for the acceptance checklist.
+
+## Firebase SDK preparation (not yet live authentication)
+
+Nikoll registered AL-Web in the Firebase project `agentic-lender-8ad70`.
+The app provides `src/firebase/firebase.ts` with lazy Firebase app/Auth initialisation, but
+the active login still uses the **local demonstration server**.
+
+1. In this directory run `npm install firebase`. This updates both `package.json` and
+   `package-lock.json`; commit **both files together**.
+2. Copy `.env.example` to `.env.local` and populate the empty values from the exact
+   Firebase Web SDK configuration received from Nikoll. Do not manually change
+   the Firebase project's `apiKey` or `appId`.
+3. Run `npm run build` and `npm run dev:all`. Verify existing three-role demo login.
+4. For a configuration-only check, temporarily import `getFirebaseApp` from
+   `./firebase/firebase` in `src/main.tsx` and run `console.log(getFirebaseApp().options.projectId)`,
+   then remove the temporary test before committing. Firebase SDK initialization does
+   **not** confirm that user authentication or Firestore permissions work.
+
+Vite exposes `VITE_*` variables to browser code. They are not secrets.
+Private service-account keys must never be used in the frontend.
+Do not run `npm ci` after adding an unsynchronised dependency to `package.json`;
+commit the npm-generated lockfile first. The real auth migration will be a separate change.
