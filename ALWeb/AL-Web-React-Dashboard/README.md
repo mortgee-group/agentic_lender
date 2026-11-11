@@ -60,13 +60,34 @@ The Register tab is a temporary *development-only* self-registration pathway. It
 
 See `STAGE3-TESTING.md` for the acceptance checklist.
 
-## Firebase Authentication integration
+## Firebase Authentication and demo registration
 
 The modular Firebase SDK is initialized in `src/firebase/firebase.ts` on demand.
-`src/services/auth.ts` uses `signInWithEmailAndPassword`, `authStateReady`,
-and `signOut`. The browser's Firebase persistence restores sessions after refresh.
-Only three known demo emails receive a local display role. All other Firebase
-users are denied access to the prototype portal screens, even if their Firebase
-credentials are valid. The next milestone is trusted backend role resolution
-and secured profile/application access.\n\n### Registration test\n\n1. In the login screen select **Register**. Enter a fresh fictional email and password, confirm the password, and choose Borrower, Broker, or Underwriter.\n2. Submit. Firebase creates a real Authentication user; the role changes only the demo dashboard.\n3. Refresh, sign out and sign back in on the same browser. Check the chosen dashboard is restored.\n4. Verify the new user appears in Firebase Console > Authentication > Users.\n5. Repeat for all roles using distinct test emails; existing three test accounts should still work.\n6. Do not use this demo role for AL-Core authorization or Firestore security rules.\n
+`src/services/auth.ts` uses Firebase email/password sign-in, account creation, session
+restoration and sign-out.
 
+The three existing test email accounts retain their fixed demo roles. Additional
+fictional accounts can be created from the Register tab by choosing a Borrower,
+Broker or Underwriter *demo UI role*. For new accounts this selection is kept
+in browser localStorage, keyed by Firebase UID, and is only available in the
+same browser until local storage is cleared. It does not follow the account to
+another browser or device.
+
+This selection is not a trusted role, Firebase custom claim or Firestore profile,
+and must never authorise AL-Core endpoints, Firestore rules, or sensitive
+application data. Disable or restrict self-registration before public deployment.
+
+### Registration test
+
+1. Select **Register** on the login screen.
+2. Enter a fresh fictional email, password and confirmation, and choose a role.
+3. Submit. Firebase creates a real Authentication account and the chosen demo
+   dashboard opens.
+4. Refresh, then sign out and sign back in using the same browser. Confirm the
+   dashboard role persists.
+5. Confirm the new account appears in Firebase Console > Authentication > Users.
+6. Repeat with a different email for the other roles. Confirm that the original
+   three test accounts still work.
+
+The next milestone is secure role provisioning with trusted backend-verified
+profiles and properly protected data access.
