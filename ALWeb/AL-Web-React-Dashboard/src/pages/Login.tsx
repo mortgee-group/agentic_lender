@@ -13,9 +13,9 @@ export default function Login({onLogin}: {onLogin: (user: AuthUser) => void}) {
  }
  return <main className="auth-shell"><section className="auth-card panel" aria-labelledby="login-title">
   <div className="auth-brand"><span className="mark">⌂</span><span>Agentic Lender</span></div>
-  <div className="eyebrow">MORTGAGE BROKER & UNDERWRITER PORTAL</div>
+  <div className="eyebrow">BORROWER · BROKER · UNDERWRITER PORTAL</div>
   <h1 id="login-title">Sign in</h1>
-  <p className="auth-description">Access your assigned loan pipeline, collateral assessments and AI audit records.</p>
+  <p className="auth-description">Sign in to your assigned mortgage application workspace.</p>
   <form onSubmit={handleSubmit}>
    <div className="field"><label htmlFor="username">Username</label><input id="username" name="username" autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required autoFocus/></div>
    <div className="field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></div>

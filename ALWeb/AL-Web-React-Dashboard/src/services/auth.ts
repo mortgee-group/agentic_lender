@@ -10,7 +10,7 @@ async function parseResponse(response:Response):Promise<AuthPayload>{
  if(typeof body!=="object"||body===null||!("user" in body))throw new Error("Invalid login response");
  const user=(body as {user?:unknown}).user;
  if(typeof user!=="object"||user===null||!("username" in user)||!("role" in user)
-    ||typeof user.username!=="string"||(user.role!=="broker"&&user.role!=="underwriter"))throw new Error("Invalid user role from demo server");
+    ||typeof user.username!=="string"||(user.role!=="borrower"&&user.role!=="broker"&&user.role!=="underwriter"))throw new Error("Invalid user role from demo server");
  return {user:user as AuthUser};
 }
 export async function login(username:string,password:string):Promise<AuthUser>{

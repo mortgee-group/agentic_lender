@@ -1,6 +1,10 @@
 import type {PortalRole} from "../types/roles";
 export type Page="portal"|"pipeline"|"files"|"file-detail"|"audit"|"stress"|"settlement"|"about";
 type Link={page:Page;icon:string;label:string};
+const borrowerLinks:Link[]=[
+ {page:"portal",icon:"▦",label:"Dashboard"},
+ {page:"files",icon:"⌑",label:"My Applications"}
+];
 const brokerLinks:Link[]=[
  {page:"portal",icon:"▦",label:"Dashboard"},
  {page:"pipeline",icon:"▤",label:"Assigned Pipeline"},
@@ -16,7 +20,7 @@ const underwriterLinks:Link[]=[
  {page:"settlement",icon:"✓",label:"Settlement & Export"}
 ];
 export default function Sidebar({page,role,onNavigate}:{page:Page;role:PortalRole;onNavigate:(page:Page)=>void}){
- const links=role==="broker"?brokerLinks:underwriterLinks;
+ const links=role==="borrower"?borrowerLinks:role==="broker"?brokerLinks:underwriterLinks;
  return <aside className="sidebar">
    <div className="logo"><span className="mark">⌂</span><span className="logotext">Agentic Lender</span></div>
    <div className="small-label">WORKSPACE</div>
