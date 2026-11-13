@@ -7,16 +7,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import com.mortgee.al_mobile.data.network.ApiClient
-import com.mortgee.al_mobile.ui.catalogue.PropertyCatalogueRoute
-import com.mortgee.al_mobile.ui.detail.PropertyDetailRoute
+import com.mortgee.al_mobile.data.repository.AccountRepository
+import com.mortgee.al_mobile.data.session.SessionOwner
+import com.mortgee.al_mobile.ui.navigation.AppNavigation
 import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -25,27 +24,31 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var apiClient: ApiClient
 
+    @Inject
+    lateinit var sessionOwner: SessionOwner
+
+    @Inject
+    lateinit var accountRepository: AccountRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (savedInstanceState == null) {
+            lifecycleScope.launch {
+                accountRepository.restoreSession()
+            }
+        }
+
         setContent {
             ALMobileTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var selectedPropertyId by remember { mutableStateOf<String?>(null) }
-
-                    selectedPropertyId?.let { propertyId ->
-                        PropertyDetailRoute(
-                            propertyId = propertyId,
-                            onBackClick = { selectedPropertyId = null }
-                        )
-                    } ?: run {
-                        PropertyCatalogueRoute(
-                            onPropertyClick = { id -> selectedPropertyId = id }
-                        )
-                    }
+                    AppNavigation(
+                        sessionOwner = sessionOwner
+                    )
                 }
             }
         }

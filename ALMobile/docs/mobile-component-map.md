@@ -7,7 +7,7 @@ This document establishes the architecture mapping, technology choices, existing
 - **Build System & Java Baseline**: AGP 9.4.1, Kotlin 2.2.10, KSP 2.3.12, Java 17 (`JavaVersion.VERSION_17`), `compileSdk` / `targetSdk` 37, Google Services Plugin 4.4.2, Firebase Crashlytics Plugin 3.0.3.
 - **Build & Security Logic**:
   - Dynamic `apiBaseUrl` Gradle property configuration with strict security validation in `app/build.gradle.kts` (HTTPS required, must end with `/`, no query/fragment/credentials/quotes/backslashes allowed).
-  - `debug` buildType configured with `applicationIdSuffix = ".dev"`, `versionNameSuffix = "-dev"`, default `API_BASE_URL` (`"https://example.invalid/"`), and optional CI keystore signing.
+  - `debug` buildType configured with `applicationIdSuffix = ".dev"`, `versionNameSuffix = "-dev"`, default `API_BASE_URL` (`"https://agentic-lender-525895646792.europe-west2.run.app/"`), and optional CI keystore signing.
   - `release` buildType configured with default production `API_BASE_URL` (`"https://api.example.com/"`) and R8 optimization scope (`setOf("androidx.**", "kotlin.**", "kotlinx.**")`).
 - **Dependency Injection**: Hilt 2.60.1 (`hilt-android`, `hilt-compiler` via KSP, `hilt-navigation-compose` 1.2.0). Application class `ALMobileApplication` annotated with `@HiltAndroidApp` and registered in `AndroidManifest.xml`; `MainActivity` annotated with `@AndroidEntryPoint`.
 - **UI Framework**: Jetpack Compose (BOM `2026.02.01`), Material 3, Material 3 Adaptive Navigation (`1.1.0`).
@@ -35,18 +35,19 @@ This document establishes the architecture mapping, technology choices, existing
 | **Build Configuration** | REUSED & UPDATED | `build.gradle.kts`<br>`app/build.gradle.kts` | AGP 9.4.1, Java 17, Hilt, KSP, Google Services, Crashlytics, strict `apiBaseUrl` HTTPS validation, `debug` / `release` buildTypes |
 | **App Manifest & Registration** | CREATED & REGISTERED | `app/src/main/AndroidManifest.xml` | Registered `ALMobileApplication` (`android:name=".ALMobileApplication"`), Internet permission, Edge-to-Edge input adjustments |
 | **Application & DI Root** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ALMobileApplication.kt` | `@HiltAndroidApp class ALMobileApplication : Application()` |
-| **App Entry Point & Navigation** | UPDATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | `@AndroidEntryPoint`, ComponentActivity, `@Inject lateinit var apiClient: ApiClient`, state-based List/Detail navigation |
+| **App Entry Point & Navigation** | UPDATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt`<br>`com/mortgee/al_mobile/ui/navigation/AppNavigation.kt`<br>`NavigationConfig.kt` | `@AndroidEntryPoint`, ComponentActivity, `@Inject lateinit var apiClient: ApiClient`, developer feature flag gated navigation (`ENABLE_TEST_FEATURE`) |
 | **HTTP Client & Network Base** | CREATED & WIRED | `app/src/main/java/com/mortgee/al_mobile/data/network/ApiClient.kt` | `@Singleton class ApiClient @Inject constructor(val retrofit: Retrofit)` |
 | **Network DTOs** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/network/model/CatalogueDtos.kt` | Moshi `@JsonClass`, `CatalogueItemDto`, `CatalogueListResponseDto` (`properties` key) |
 | **Retrofit API Service** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/network/CatalogueApiService.kt` | `GET /api/v1/properties`, `GET /api/v1/properties/{id}` |
 | **Domain Models** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/model/PropertyListing.kt` | `PropertyListing` unified domain data class |
 | **Repositories** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/data/repository/CatalogueRepository.kt`<br>`ApiCatalogueRepository.kt` | Coroutines Result mapping, error handling, `getPropertyDetail(id)` |
 | **Dependency Injection Modules** | CREATED | `app/src/main/java/com/mortgee/al_mobile/di/NetworkModule.kt`<br>`RepositoryModule.kt` | Hilt `@Module`, `@InstallIn(SingletonComponent::class)` |
-| **Property Catalogue UI** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/ui/catalogue/PropertyCatalogueScreen.kt`<br>`PropertyCatalogueViewModel.kt`, `PropertyCatalogueRoute.kt` | Compose Material 3, compact card with location & spec badges |
+| **Property Catalogue UI** | MODIFIED | `app/src/main/java/com/mortgee/al_mobile/ui/catalogue/PropertyCatalogueScreen.kt`<br>`PropertyCatalogueViewModel.kt`, `PropertyCatalogueRoute.kt` | Compose Material 3, compact card with location & spec badges, Test Feature top app bar action |
 | **Property Detail UI** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ui/detail/PropertyDetailScreen.kt`<br>`PropertyDetailViewModel.kt`, `PropertyDetailRoute.kt` | Compose Material 3, full property specification view |
+| **Test / Feature Playground UI** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ui/testfeature/TestFeatureScreen.kt`<br>`TestFeatureViewModel.kt`, `TestFeatureRoute.kt`, `TestFeatureUiState.kt` | Compose Material 3, feature flag status, environment diagnostics & interactive form validator test harness |
 | **Form Validation** | CREATED | `app/src/main/java/com/mortgee/al_mobile/ui/form/PropertyFormValidator.kt` | Location, size (m²), bedrooms (0=studio), property type & BER validation |
 | **Theme & Typography** | REUSED | `app/src/main/java/com/mortgee/al_mobile/ui/theme/Theme.kt`<br>`Color.kt`, `Type.kt` | Material 3 Theme |
-| **Unit Testing** | CREATED / MODIFIED | `app/src/test/java/com/mortgee/al_mobile/data/repository/ApiCatalogueRepositoryTest.kt`<br>`PropertyCatalogueViewModelTest.kt`<br>`PropertyDetailViewModelTest.kt`<br>`PropertyFormValidatorTest.kt` | JUnit 4, Coroutines Test, MockWebServer |
+| **Unit Testing** | CREATED / MODIFIED | `app/src/test/java/com/mortgee/al_mobile/data/repository/ApiCatalogueRepositoryTest.kt`<br>`PropertyCatalogueViewModelTest.kt`<br>`PropertyDetailViewModelTest.kt`<br>`PropertyFormValidatorTest.kt`<br>`TestFeatureViewModelTest.kt`<br>`NavigationConfigTest.kt` | JUnit 4, Coroutines Test, MockWebServer |
 
 ---
 
@@ -90,5 +91,6 @@ This document establishes the architecture mapping, technology choices, existing
 - [x] Unified DTO and domain model (`CatalogueItemDto` & `PropertyListing`).
 - [x] Detail endpoint `GET /api/v1/properties/{id}` added to `CatalogueApiService`, `CatalogueRepository`, and `ApiCatalogueRepository`.
 - [x] Compact list card and full detail screen implemented in Compose M3.
+- [x] Test / Feature playground screen (`TestFeatureScreen`) gated by developer feature flag (`NavigationConfig.ENABLE_TEST_FEATURE`).
 - [x] `PropertyFormValidator` created and unit tested for property create/edit fields.
 - [x] Comprehensive unit tests passing cleanly via `testDebugUnitTest`.
