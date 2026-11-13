@@ -16,9 +16,20 @@ class UserProfile(BaseModel):
     email: str
     role: UserRole
     display_name: str = Field(default="")
+    first_name: str = Field(default="")
+    last_name: str = Field(default="")
+    phone_number: str | None = None
+    createdAt: datetime | None = None
+    updatedAt: datetime | None = None
 
 class UserProfileCreate(BaseModel):
-    display_name: str = Field(default="", max_length=30)
+    first_name: str = Field(min_length=1, max_length=30)
+    last_name: str = Field(min_length=1, max_length=50)
+    phone_number: str | None = Field(default=None, max_length=20)
+
+    # Temporary: users can select their role during initial integration.
+    # Final sprint: restrict Broker and Underwriter role assignment.
+    role: UserRole
 
 
 class ApplicationStatus(str, Enum):
@@ -53,19 +64,16 @@ BERCode = Literal[
 
 
 class PropertyDetails(BaseModel):
-    location: str = Field(min_length=1)
     county: str = Field(min_length=1)
-
-    floorArea: float = Field(
+    floor_area: float = Field(
         gt=0,
         description="Property floor area in square metres (m²)"
     )
-
     bedrooms: int = Field(ge=0)
     bathrooms: int = Field(ge=0)
-    yearBuilt: int = Field(ge=1800, le=2100)
-    propertyType: PropertyType
-    berEnergyRating: BERCode | None = None
+    year_built: int = Field(ge=1800, le=2100)
+    property_type: PropertyType
+    ber_rating: BERCode
 
 
 
