@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import javax.inject.Singleton
+import com.mortgee.al_mobile.data.network.CatalogueApiService
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -42,5 +43,13 @@ object NetworkModule {
             .client(okHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCatalogueApiService(
+        retrofit: Retrofit
+    ): CatalogueApiService {
+        return retrofit.create(CatalogueApiService::class.java)
     }
 }
