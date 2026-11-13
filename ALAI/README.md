@@ -33,7 +33,7 @@ GROQ_API_KEY=YOUR_GROQ_API_KEY
 ## Run train_daft_housing_model_knn 
 `python -m ml.train_daft_housing_model_knn`
 ## Run train_daft_housing_model_rf
-`python -m ml.train_daft_housing_model_fr`
+`python -m ml.train_daft_housing_model_rf`
 ## Start api
 `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 

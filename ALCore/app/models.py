@@ -16,9 +16,20 @@ class UserProfile(BaseModel):
     email: str
     role: UserRole
     display_name: str = Field(default="")
+    first_name: str = Field(default="")
+    last_name: str = Field(default="")
+    phone_number: str | None = None
+    createdAt: datetime | None = None
+    updatedAt: datetime | None = None
 
 class UserProfileCreate(BaseModel):
-    display_name: str = Field(default="", max_length=30)
+    first_name: str = Field(min_length=1, max_length=30)
+    last_name: str = Field(min_length=1, max_length=50)
+    phone_number: str | None = Field(default=None, max_length=20)
+
+    # Temporary: users can select their role during initial integration.
+    # Final sprint: restrict Broker and Underwriter role assignment.
+    role: UserRole
 
 
 class ApplicationStatus(str, Enum):

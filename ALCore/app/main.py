@@ -5,6 +5,7 @@ from app.users import get_user_profile, create_user_profile
 from app.permissions import require_role
 from google.api_core.exceptions import AlreadyExists
 import httpx
+from datetime import datetime, timezone
 from app.ai_client import assess_application, underwrite_application
 from app.applications import (
     create_application,
@@ -78,11 +79,18 @@ def register_user(
             detail="Firebase account has no email address"
         )
 
+    now = datetime.now(timezone.utc)
+
     profile = UserProfile(
         uid=uid,
         email=email,
-        role=UserRole.BORROWER,
-        display_name=data.display_name,
+        role=data.role,
+        display_name=f"{data.first_name} {data.last_name}",
+        first_name=data.first_name,
+        last_name=data.last_name,
+        phone_number=data.phone_number,
+        createdAt=now,
+        updatedAt=now,
     )
 
     try:
