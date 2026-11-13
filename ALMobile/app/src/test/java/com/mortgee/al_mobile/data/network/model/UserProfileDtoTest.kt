@@ -22,6 +22,38 @@ class UserProfileDtoTest {
     }
 
     @Test
+    fun `parses complete user DTO with all extended profile fields`() {
+        val json = """
+            {
+              "uid": "firebase_uid_123",
+              "email": "borrower@example.com",
+              "display_name": "Example Borrower",
+              "role": "borrower",
+              "first_name": "John",
+              "last_name": "Conner",
+              "phone_number": "+353871234567",
+              "createdAt": "2026-11-06T10:00:00Z",
+              "updatedAt": "2026-11-06T10:00:00Z"
+            }
+        """.trimIndent()
+
+        val adapter = moshi.adapter(UserProfileDto::class.java)
+        val dto = adapter.fromJson(json)
+
+        requireNotNull(dto)
+        assertEquals("firebase_uid_123", dto.uid)
+        assertEquals("borrower@example.com", dto.email)
+        assertEquals("Example Borrower", dto.displayName)
+        assertEquals("borrower", dto.role)
+        assertEquals("John", dto.firstName)
+        assertEquals("Conner", dto.lastName)
+        assertEquals("+353871234567", dto.phoneNumber)
+        assertEquals("2026-11-06T10:00:00Z", dto.createdAt)
+        assertEquals("2026-11-06T10:00:00Z", dto.updatedAt)
+        assertEquals(BackendRole.BORROWER, dto.decodeRole())
+    }
+
+    @Test
     fun `parses valid documented payload including display_name`() {
         val json = """
             {

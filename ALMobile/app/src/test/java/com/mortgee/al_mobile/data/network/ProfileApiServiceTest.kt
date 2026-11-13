@@ -51,10 +51,15 @@ class ProfileApiServiceTest {
     fun `getProfile sends GET to users me with exact bearer header on approved origin`() = runTest {
         val jsonResponse = """
             {
-                "uid": "user_abc123",
+                "uid": "firebase_uid_123",
                 "email": "borrower@example.com",
+                "display_name": "Example Borrower",
                 "role": "borrower",
-                "display_name": "Alice Borrower"
+                "first_name": "John",
+                "last_name": "Conner",
+                "phone_number": "+353871234567",
+                "createdAt": "2026-11-06T10:00:00Z",
+                "updatedAt": "2026-11-06T10:00:00Z"
             }
         """.trimIndent()
 
@@ -63,10 +68,15 @@ class ProfileApiServiceTest {
         val token = "Bearer candidate-id-token-xyz"
         val profile = profileApiService.getProfile(token)
 
-        assertEquals("user_abc123", profile.uid)
+        assertEquals("firebase_uid_123", profile.uid)
         assertEquals("borrower@example.com", profile.email)
         assertEquals("borrower", profile.role)
-        assertEquals("Alice Borrower", profile.displayName)
+        assertEquals("Example Borrower", profile.displayName)
+        assertEquals("John", profile.firstName)
+        assertEquals("Conner", profile.lastName)
+        assertEquals("+353871234567", profile.phoneNumber)
+        assertEquals("2026-11-06T10:00:00Z", profile.createdAt)
+        assertEquals("2026-11-06T10:00:00Z", profile.updatedAt)
         assertEquals(BackendRole.BORROWER, profile.decodeRole())
 
         val request = mockWebServer.takeRequest()

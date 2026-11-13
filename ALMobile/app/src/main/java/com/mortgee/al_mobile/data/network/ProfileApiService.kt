@@ -14,7 +14,7 @@ interface ProfileApiService {
      * Reads candidate user profile from GET /users/me using an explicit candidate bearer token.
      *
      * @param bearerToken Authorization header value formatted as "Bearer <token>".
-     * @return [UserProfileDto] containing wire fields uid, email, role, display_name.
+     * @return [UserProfileDto] containing wire fields uid, email, role, display_name, first_name, last_name, phone_number, createdAt, updatedAt.
      */
     @GET("users/me")
     suspend fun getProfile(

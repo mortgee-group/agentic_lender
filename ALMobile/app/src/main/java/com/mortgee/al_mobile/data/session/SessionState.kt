@@ -36,6 +36,11 @@ sealed interface SessionState {
      * @property email User's email address.
      * @property role Supported backend role (borrower, broker, underwriter).
      * @property displayName Optional user display name.
+     * @property firstName Optional user first name.
+     * @property lastName Optional user last name.
+     * @property phoneNumber Optional user phone number.
+     * @property createdAt Optional ISO creation timestamp.
+     * @property updatedAt Optional ISO update timestamp.
      */
     data class Authenticated(
         val key: SessionKey,
@@ -43,6 +48,11 @@ sealed interface SessionState {
         val email: String,
         val role: BackendRole,
         val displayName: String? = null,
+        val firstName: String? = null,
+        val lastName: String? = null,
+        val phoneNumber: String? = null,
+        val createdAt: String? = null,
+        val updatedAt: String? = null,
     ) : SessionState
 
     /**

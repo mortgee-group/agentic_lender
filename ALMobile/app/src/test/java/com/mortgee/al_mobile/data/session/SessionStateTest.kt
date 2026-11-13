@@ -47,6 +47,11 @@ class SessionStateTest {
             email = "borrower@example.com",
             role = BackendRole.BORROWER,
             displayName = "Jane Borrower",
+            firstName = "Jane",
+            lastName = "Doe",
+            phoneNumber = "+353871234567",
+            createdAt = "2026-11-06T10:00:00Z",
+            updatedAt = "2026-11-06T10:00:00Z"
         )
 
         assertTrue(state.isAuthenticated)
@@ -55,6 +60,11 @@ class SessionStateTest {
         assertEquals("borrower@example.com", (state as SessionState.Authenticated).email)
         assertEquals(BackendRole.BORROWER, state.role)
         assertEquals("Jane Borrower", state.displayName)
+        assertEquals("Jane", state.firstName)
+        assertEquals("Doe", state.lastName)
+        assertEquals("+353871234567", state.phoneNumber)
+        assertEquals("2026-11-06T10:00:00Z", state.createdAt)
+        assertEquals("2026-11-06T10:00:00Z", state.updatedAt)
     }
 
     @Test

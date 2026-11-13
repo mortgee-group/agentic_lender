@@ -59,7 +59,12 @@ class DefaultSessionOwner @Inject constructor(
         uid: String,
         email: String,
         role: BackendRole,
-        displayName: String?
+        displayName: String?,
+        firstName: String?,
+        lastName: String?,
+        phoneNumber: String?,
+        createdAt: String?,
+        updatedAt: String?
     ): Boolean {
         val (isMatch, saveSuccess) = gateMutex.withLock {
             if (activeAttempt != attempt) return@withLock Pair(false, false)
@@ -79,7 +84,12 @@ class DefaultSessionOwner @Inject constructor(
                 uid = uid,
                 email = email,
                 role = role,
-                displayName = displayName
+                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
+                phoneNumber = phoneNumber,
+                createdAt = createdAt,
+                updatedAt = updatedAt
             )
             activeAttempt = null
             Pair(true, true)

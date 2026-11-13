@@ -274,7 +274,12 @@ class UserPrivateRepositoryTest {
             uid: String,
             email: String,
             role: BackendRole,
-            displayName: String?
+            displayName: String?,
+            firstName: String?,
+            lastName: String?,
+            phoneNumber: String?,
+            createdAt: String?,
+            updatedAt: String?
         ): Boolean = false
 
         override suspend fun invalidateSession(): Boolean {

@@ -62,7 +62,12 @@ class ApiAccountRepositoryTest {
             uid = candidateUid,
             email = candidateEmail,
             role = "borrower",
-            displayName = "Test Borrower"
+            displayName = "Test Borrower",
+            firstName = "John",
+            lastName = "Conner",
+            phoneNumber = "+353871234567",
+            createdAt = "2026-11-06T10:00:00Z",
+            updatedAt = "2026-11-06T10:00:00Z"
         )
 
         val result = repository.signIn("borrower@example.com", "password123")
@@ -77,6 +82,11 @@ class ApiAccountRepositoryTest {
         assertEquals(candidateEmail, authState.email)
         assertEquals(BackendRole.BORROWER, authState.role)
         assertEquals("Test Borrower", authState.displayName)
+        assertEquals("John", authState.firstName)
+        assertEquals("Conner", authState.lastName)
+        assertEquals("+353871234567", authState.phoneNumber)
+        assertEquals("2026-11-06T10:00:00Z", authState.createdAt)
+        assertEquals("2026-11-06T10:00:00Z", authState.updatedAt)
     }
 
     @Test

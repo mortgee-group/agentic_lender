@@ -55,6 +55,11 @@ interface SessionOwner {
         email: String,
         role: BackendRole,
         displayName: String? = null,
+        firstName: String? = null,
+        lastName: String? = null,
+        phoneNumber: String? = null,
+        createdAt: String? = null,
+        updatedAt: String? = null,
     ): Boolean
 
     /**

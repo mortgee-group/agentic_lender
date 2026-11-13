@@ -220,7 +220,18 @@ class UserPrivateStoreTest {
 
         override suspend fun startSignInAttempt(): SessionAttempt? = null
         override suspend fun startRestoreAttempt(): SessionAttempt? = null
-        override suspend fun commitSession(attempt: SessionAttempt, uid: String, email: String, role: BackendRole, displayName: String?): Boolean = false
+        override suspend fun commitSession(
+            attempt: SessionAttempt,
+            uid: String,
+            email: String,
+            role: BackendRole,
+            displayName: String?,
+            firstName: String?,
+            lastName: String?,
+            phoneNumber: String?,
+            createdAt: String?,
+            updatedAt: String?
+        ): Boolean = false
         override suspend fun invalidateSession(): Boolean = true
         override suspend fun signOut(): Boolean = true
         override suspend fun cancelAttempt(attempt: SessionAttempt) {}

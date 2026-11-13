@@ -46,7 +46,12 @@ class SessionOwnerContractTest {
             uid: String,
             email: String,
             role: BackendRole,
-            displayName: String?
+            displayName: String?,
+            firstName: String?,
+            lastName: String?,
+            phoneNumber: String?,
+            createdAt: String?,
+            updatedAt: String?
         ): Boolean {
             if (activeAttempt != attempt) return false
 
@@ -64,7 +69,12 @@ class SessionOwnerContractTest {
                 uid = uid,
                 email = email,
                 role = role,
-                displayName = displayName
+                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
+                phoneNumber = phoneNumber,
+                createdAt = createdAt,
+                updatedAt = updatedAt
             )
             activeAttempt = null
             return true

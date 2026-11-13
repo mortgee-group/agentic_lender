@@ -60,6 +60,7 @@ fun AppNavigation(
             when (val destination = currentDestination) {
                 is NavDestination.AuthenticatedLanding -> {
                     AuthenticatedLandingRoute(
+                        authenticatedState = authenticatedState,
                         onSignOut = handleSignOut,
                         modifier = modifier
                     )

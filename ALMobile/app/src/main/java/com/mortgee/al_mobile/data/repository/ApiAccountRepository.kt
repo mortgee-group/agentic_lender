@@ -83,6 +83,11 @@ class ApiAccountRepository @Inject constructor(
                 email = profile.email,
                 role = role,
                 displayName = profile.displayName,
+                firstName = profile.firstName,
+                lastName = profile.lastName,
+                phoneNumber = profile.phoneNumber,
+                createdAt = profile.createdAt,
+                updatedAt = profile.updatedAt,
             )
 
             if (committed) {
@@ -165,6 +170,11 @@ class ApiAccountRepository @Inject constructor(
                 email = profile.email,
                 role = role,
                 displayName = profile.displayName,
+                firstName = profile.firstName,
+                lastName = profile.lastName,
+                phoneNumber = profile.phoneNumber,
+                createdAt = profile.createdAt,
+                updatedAt = profile.updatedAt,
             )
 
             if (committed) {
