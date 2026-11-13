@@ -60,7 +60,7 @@ class PropertyDetails(BaseModel):
     )
     bedrooms: int = Field(ge=0)
     bathrooms: int = Field(ge=0)
-    year_built: int = Field(ge=1800, le=2100)
+    year_built: int = Field(ge=1800, le=2030)
     property_type: PropertyType
     ber_rating: BERCode
 
@@ -71,7 +71,7 @@ class LoanApplicationCreate(BaseModel):
     existingDebtLiabilities: float = Field(ge=0)
     deposit: float = Field(ge=0)
 
-    requestedMortgageTerm: int = Field(gt=0)
+    requestedMortgageTerm: int = Field(ge=1, le=40)
     sellerAskingPrice: float = Field(gt=0)
 
     property: PropertyDetails
@@ -95,15 +95,8 @@ class LoanApplication(LoanApplicationCreate):
     requestedLoanAmount: float | None = Field(default=None, ge=0)
     estimatedLTV: float | None = Field(default=None, ge=0)
     DTI: float | None = Field(default=None, ge=0)
-    approvalLikelihood: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-    )
-
-    # Risk assessment for AL-Web.
-    riskTier: Literal["LOW", "MEDIUM", "HIGH"] | None = None
-
+    approvalLikelihood: Literal["High", "Medium", "Low"] | None = None
+    riskTier: Literal["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5"] | None = None
     # Application workflow.
     lifecycleStatus: ApplicationStatus = ApplicationStatus.APPLIED
 

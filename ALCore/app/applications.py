@@ -86,3 +86,92 @@ def list_applications_for_user(
     )
     for document in documents
     ]
+
+
+def save_ai_decision(
+    application_id: str,
+    decision_data: dict,
+) -> None:
+    """Save an AI underwriting decision to Firestore."""
+
+    now = datetime.now(timezone.utc)
+
+    # Store the complete AI response for auditing.
+    db.collection("aiDecisions").document(application_id).set({
+        **decision_data,
+        "applicationId": application_id,
+        "recordedAt": now,
+    })
+
+    # Update the mortgage application with its AI assessment.
+    db.collection("applications").document(application_id).update({
+        "estimatedLTV": decision_data.get("estimatedLTV"),
+        "DTI": decision_data.get("DTI"),
+        "approvalLikelihood": decision_data.get("approvalLikelihood"),
+        "riskTier": decision_data.get("riskTier"),
+        "lifecycleStatus": "AI_DELIBERATED",
+        "updatedAt": now,
+    })
+
+
+def save_ai_decision(
+    application_id: str,
+    decision_data: dict,
+) -> str:
+    """Save an AI decision and update the application atomically."""
+
+    now = datetime.now(timezone.utc)
+
+    decision_ref = db.collection("aiDecisions").document()
+    application_ref = db.collection("applications").document(application_id)
+
+    decision_record = {
+        "applicationId": application_id,
+        "finalLendingDecision": decision_data["decision"],
+        "creditMemorandum": decision_data.get("credit_memo"),
+        "reasoningLogs": decision_data.get("agent_trails", []),
+        "agentConsensus": decision_data.get("agent_outputs", {}),
+        "individualDecisionTrails": decision_data.get("agent_trails", []),
+        "createdAt": now,
+        # Preserve the complete AL-AI response for auditing.
+        "aiResponse": decision_data,
+    }
+
+    application_updates = {
+        "estimatedLTV": decision_data.get("estimatedLTV"),
+        "DTI": decision_data.get("DTI"),
+        "approvalLikelihood": decision_data.get("approvalLikelihood"),
+        "riskTier": decision_data.get("riskTier"),
+        "lifecycleStatus": "AI_DELIBERATED",
+        "updatedAt": now,
+    }
+
+    batch = db.batch()
+    batch.set(decision_ref, decision_record)
+    batch.update(application_ref, application_updates)
+    batch.commit()
+
+    return decision_ref.id
+
+
+def save_valuation(
+    application_id: str,
+    property_data: dict,
+    assessment_data: dict,
+) -> str:
+    """Save an AI property valuation to Firestore."""
+
+    now = datetime.now(timezone.utc)
+
+    valuation_ref = db.collection("valuations").document()
+
+    valuation_record = {
+        "applicationId": application_id,
+        "valuationPrediction": assessment_data["predicted_value"],
+        "valuationData": property_data,
+        "createdAt": now,
+    }
+
+    valuation_ref.set(valuation_record)
+
+    return valuation_ref.id
