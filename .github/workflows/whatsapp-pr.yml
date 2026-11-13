@@ -1,0 +1,33 @@
+name: WhatsApp PR notification
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post review link to WhatsApp
+        env:
+          WAHA_URL: ${{ secrets.WAHA_URL }}
+          WAHA_API_KEY: ${{ secrets.WAHA_API_KEY }}
+          GROUP_ID: ${{ secrets.WHATSAPP_GROUP_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          message=$(printf 'Please review PR #%s — %s\n%s' \
+            "$PR_NUMBER" "$PR_TITLE" "$PR_URL")
+
+          jq -n --arg chatId "$GROUP_ID" --arg text "$message" \
+            '{session: "default", chatId: $chatId, text: $text}' |
+            curl --fail --silent --show-error --max-time 20 \
+              --output /dev/null \
+              --header "X-Api-Key: $WAHA_API_KEY" \
+              --header "Content-Type: application/json" \
+              --data-binary @- \
+              "${WAHA_URL%/}/api/sendText"
