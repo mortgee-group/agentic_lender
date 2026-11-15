@@ -99,32 +99,6 @@ def list_applications_for_user(
 def save_ai_decision(
     application_id: str,
     decision_data: dict,
-) -> None:
-    """Save an AI underwriting decision to Firestore."""
-
-    now = datetime.now(timezone.utc)
-
-    # Store the complete AI response for auditing.
-    db.collection("aiDecisions").document(application_id).set({
-        **decision_data,
-        "applicationId": application_id,
-        "recordedAt": now,
-    })
-
-    # Update the mortgage application with its AI assessment.
-    db.collection("applications").document(application_id).update({
-        "estimatedLTV": decision_data.get("estimatedLTV"),
-        "DTI": decision_data.get("DTI"),
-        "approvalLikelihood": decision_data.get("approvalLikelihood"),
-        "riskTier": decision_data.get("riskTier"),
-        "lifecycleStatus": "AI_DELIBERATED",
-        "updatedAt": now,
-    })
-
-
-def save_ai_decision(
-    application_id: str,
-    decision_data: dict,
 ) -> str:
     """Save an AI decision and update the application atomically."""
 
