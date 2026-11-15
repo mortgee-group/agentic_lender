@@ -29,3 +29,10 @@
 .live-workspace-heading .subtitle{margin-bottom:0}
 .live-workspace .portal-metrics{margin-bottom:18px}
 .live-workspace .live-applications{margin-bottom:24px}
+
+/* AL-Core/AL-AI explicit test actions and display. */
+.ai-live-actions{margin:16px 0}.ai-action-buttons{margin-top:16px}
+.ai-live-results{margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:9px;background:#f8faff}
+.ai-live-results h3{font-size:14px;margin:12px 0}.ai-live-results .detail-row strong{overflow-wrap:anywhere}
+.ai-live-results p,.ai-live-results li{font-size:13px;line-height:1.6}
+.ai-credit-memo{white-space:pre-wrap;overflow-wrap:anywhere}

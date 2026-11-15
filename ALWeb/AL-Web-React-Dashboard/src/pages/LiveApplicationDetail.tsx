@@ -1,5 +1,7 @@
 import {useEffect,useState} from "react";
 import {ApiError,getCoreApplication,type CoreApplication} from "../services/api";
+import AiActions from "../components/AiActions";
+import type {PortalRole} from "../types/roles";
 
 const euro=new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0});
 const amount=(n:number|null|undefined)=>typeof n==="number"&&Number.isFinite(n)?euro.format(n):"—";
@@ -7,8 +9,8 @@ const percent=(n:number|null|undefined)=>typeof n==="number"&&Number.isFinite(n)
 const date=(s:string|null|undefined)=>s?s.slice(0,10):"—";
 const propertyType=(type:string)=>type.replace(/_/g," ").toLowerCase().replace(/\b\w/g,letter=>letter.toUpperCase());
 
-export default function LiveApplicationDetail({applicationId,onBack}:{
- applicationId:string;onBack:()=>void;
+export default function LiveApplicationDetail({applicationId,role,onBack}:{
+ applicationId:string;role:PortalRole;onBack:()=>void;
 }){
  const [record,setRecord]=useState<CoreApplication|null>(null);
  const [status,setStatus]=useState<"loading"|"loaded"|"error">("loading");
@@ -76,6 +78,7 @@ export default function LiveApplicationDetail({applicationId,onBack}:{
      {field("BER rating",record.property.ber_rating)}
     </div>
    </div>
+   <AiActions applicationId={applicationId} role={role} onUpdated={()=>setReload(n=>n+1)}/>
    <div className="panel pad"><h2>Assignment</h2>
     {field("Borrower UID",record.borrowerId)}
     {field("Broker UID",record.brokerId??"Not assigned")}
