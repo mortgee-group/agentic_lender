@@ -238,3 +238,22 @@ AL-AI, not a React bug.
 Initial AI results are displayed as returned. A persistent structured audit
 view and workflow status transitions remain future milestones. All changes
 are confined to AL-Web.
+
+## AI response presentation (offline development)
+
+The live application detail page now includes **Preview example results
+(offline)** for Brokers and Underwriters. This toggles the same structured
+`AiResults` component used for real `POST /assess` and `POST /underwrite`
+responses; no API call is made and no Firestore document is written.
+
+Example response data is explicitly labelled **EXAMPLE DATA — NO AI
+INFERENCE** and does not represent the opened mortgage application or real
+market conditions. The component renders: ML valuation and affordability,
+AI recommendation, risk tiers, conditions, model-specific agent output,
+raw trail, and credit memorandum. Actual service results, when available,
+have a separate **AL-CORE API RESPONSE** label.
+
+The API currently provides these results directly after executing the
+POST operations. Persistent historical decision retrieval will require an
+authorised read endpoint in AL-Core; reloading the page does not restore
+the full detailed decision trail.

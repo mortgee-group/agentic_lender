@@ -36,3 +36,19 @@
 .ai-live-results h3{font-size:14px;margin:12px 0}.ai-live-results .detail-row strong{overflow-wrap:anywhere}
 .ai-live-results p,.ai-live-results li{font-size:13px;line-height:1.6}
 .ai-credit-memo{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* AI audit response preview and live result renderer. */
+.ai-results-layout{display:grid;gap:14px;margin-top:20px}
+.ai-results-banner{padding:11px 14px;border-radius:7px;border:1px solid var(--line);font-size:12px;line-height:1.6}
+.ai-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.ai-result-grid .detail-row{align-items:start}
+.ai-recommendation{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin:16px 0}
+.ai-recommendation>div{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.ai-recommendation strong{display:block;font-size:17px;margin-top:7px;overflow-wrap:anywhere}
+.ai-agent-panels{margin-top:14px;display:grid;gap:9px}
+.ai-agent-panel{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fff}
+.ai-agent-panel summary{font-size:13px;font-weight:700;cursor:pointer}
+.ai-agent-line{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px}
+.ai-agent-line strong{overflow-wrap:anywhere}.ai-agent-line span{white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-raw-trail{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
+@media(max-width:800px){.ai-recommendation{grid-template-columns:1fr}.ai-result-grid{grid-template-columns:1fr}.ai-agent-line{grid-template-columns:1fr;gap:3px}}
