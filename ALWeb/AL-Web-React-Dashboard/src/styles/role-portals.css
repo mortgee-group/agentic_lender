@@ -23,3 +23,9 @@
 .live-detail .detail-row strong{overflow-wrap:anywhere;min-width:0}
 .live-detail .panel h2{margin:0 0 14px}
 @media(max-width:630px){.live-detail-actions{width:100%}}
+
+/* Live API-backed dashboard metrics */
+.live-workspace-heading{margin:12px 0 16px}
+.live-workspace-heading .subtitle{margin-bottom:0}
+.live-workspace .portal-metrics{margin-bottom:18px}
+.live-workspace .live-applications{margin-bottom:24px}

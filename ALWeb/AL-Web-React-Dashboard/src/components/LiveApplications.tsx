@@ -12,7 +12,7 @@ const riskDescription=(tier:CoreApplication["riskTier"])=>{
 };
 const date = (value:string|null) => value?value.slice(0,10):"—";
 
-export default function LiveApplications({user,onOpenApplication}:{user:AuthUser;onOpenApplication:(id:string)=>void}){
+export default function LiveApplications({user,onOpenApplication,dashboard=false}:{user:AuthUser;onOpenApplication:(id:string)=>void;dashboard?:boolean}){
  const [records,setRecords]=useState<CoreApplication[]>([]);
  const [status,setStatus]=useState<"loading"|"loaded"|"error">("loading");
  const [error,setError]=useState("");
@@ -35,9 +35,30 @@ export default function LiveApplications({user,onOpenApplication}:{user:AuthUser
   return ()=>{active=false;};
  },[user.uid,revision]);
 
- return <section className="panel live-applications section" aria-label="Live AL-Core applications">
+ const awaiting=records.filter(r=>r.lifecycleStatus==="APPLIED"||r.lifecycleStatus==="AI_DELIBERATED").length;
+ const assessed=records.filter(r=>r.riskTier!==null||r.lifecycleStatus!=="APPLIED").length;
+ const highRisk=records.filter(r=>r.riskTier==="Tier 4"||r.riskTier==="Tier 5").length;
+ const scope=user.role==="borrower"?"My applications":user.role==="broker"?"Assigned client applications":"Underwriting portfolio";
+ return <section className="live-workspace" aria-label="Live AL-Core applications">
+  {dashboard&&<>
+   <div className="flex-between live-workspace-heading">
+    <div><span className="eyebrow">Live AL-Core data</span>
+     <h1 className="page-title">{user.role==="borrower"?"Borrower Dashboard":user.role==="broker"?"Broker Dashboard":"Underwriter Dashboard"}</h1>
+     <p className="subtitle">Application information retrieved from Firestore through AL-Core for your verified account.</p>
+    </div><span className="status">Live API</span>
+   </div>
+   {status==="loaded"&&<div className="grid3 portal-metrics" role="status" aria-label="Live dashboard metrics">
+    <div className="panel stat"><div className="label">{scope}</div><div className="value">{records.length}</div><div className="mini">Accessible Firestore applications</div></div>
+    <div className="panel stat"><div className="label">Awaiting final decision</div><div className="value">{awaiting}</div><div className="mini">Applied or AI deliberated</div></div>
+    <div className="panel stat"><div className="label">{user.role==="borrower"?"Assessed applications":"High-risk files"}</div>
+     <div className="value">{user.role==="borrower"?assessed:highRisk}</div>
+     <div className="mini">{user.role==="borrower"?"AI assessment recorded or status advanced":"Risk tier 4–5"}</div>
+    </div>
+   </div>}
+  </>}
+  <div className="panel live-applications section">
   <div className="table-head">
-   <div><h2>Live mortgage applications</h2>
+   <div><h2>{dashboard?scope:scope}</h2>
     <p className="live-applications-caption">Read-only records from AL-Core / Firestore · Permissions enforced by the backend</p></div>
    <button type="button" className="btn secondary" onClick={refresh} disabled={status==="loading"}>
     {status==="loading"?"Loading…":"Refresh"}
@@ -65,6 +86,7 @@ export default function LiveApplications({user,onOpenApplication}:{user:AuthUser
     </tr>)}</tbody>
    </table></div>
   </>}
-  <p className="live-applications-footer">Your demo dashboard below continues to use fictional sample data. Backend application ownership and assignment are checked by AL-Core.</p>
+  <p className="live-applications-footer">Records shown above come from AL-Core. Backend application ownership and assignment are checked by AL-Core. Synthetic AI Audit examples remain separate.</p>
+ </div>
  </section>;
 }

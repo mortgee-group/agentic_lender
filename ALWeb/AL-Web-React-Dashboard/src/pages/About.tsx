@@ -1,6 +1,18 @@
-export default function About(){return <section className="page active"><span className="eyebrow">Project information</span><h1 className="page-title">About Agentic Lender</h1><p className="subtitle">Broker and bank underwriter portal for a third-year software development project.</p>
- <div className="about-grid"><div className="panel pad"><h2>AL-Web responsibilities</h2><p>Broker access to assigned loan files; underwriter access to the portfolio, collateral assessments, agent deliberations, stress testing and authorisation workflows.</p></div>
- <div className="panel pad"><h2>Technology</h2>{[["Frontend","React + TypeScript + Vite"],["Backend gateway","AL-Core / FastAPI"],["Authentication","Local test accounts; Firebase integration pending"],["Current data","Fictional frontend fixtures"]].map(([name,value])=><div className="detail-row" key={name}><span>{name}</span><strong>{value}</strong></div>)}</div></div>
- <div className="panel pad section"><h2>System architecture</h2><div className="architecture"><span className="archbox">AL-Web</span><span className="arrow">→</span><span className="archbox">AL-Core API</span><span className="arrow">→</span><span className="archbox">AL-AI Engine</span><span className="arrow">+</span><span className="archbox">Ledger</span></div><p>All protected application data, decisions and approval actions must ultimately be supplied and authorised by AL-Core.</p></div>
- <div className="panel pad section"><h2>Current development status</h2><p>Role-based navigation, a fictional loan pipeline, read-only collateral assessment and a synthetic AI audit console are implemented. Macro stress testing, settlement/export, Firebase authorisation and real AI processing remain to be integrated.</p></div>
+export default function About(){return <section className="page active">
+ <span className="eyebrow">Project information</span>
+ <h1 className="page-title">About Agentic Lender</h1>
+ <p className="subtitle">React portal for borrowers, brokers and underwriters in a third-year software development project.</p>
+ <div className="about-grid">
+  <div className="panel pad"><h2>AL-Web responsibilities</h2>
+   <p>Firebase email/password authentication, the user portal, mortgage application submission, application review, and eventual AI workflow integration with AL-Core.</p>
+  </div>
+  <div className="panel pad"><h2>Technology</h2>
+   {([["Frontend","React + TypeScript + Vite"],["Backend API","AL-Core / FastAPI (Cloud Run)"],["Authentication","Firebase Authentication + verified ID tokens"],["Application data","AL-Core / Firestore"],["AI Audit","Separate fictional demonstration view"]] as const).map(([name,value])=>
+    <div className="detail-row" key={name}><span>{name}</span><strong>{value}</strong></div>)}
+  </div>
+ </div>
+ <div className="panel pad section"><h2>Current integration status</h2>
+  <p>The dashboards, application lists, mortgage submission and individual application details use AL-Core and Firestore. All application permissions are enforced by AL-Core; frontend role navigation is only presentation.</p>
+  <p>The AI Audit page retains clearly labelled synthetic demonstrations until its real AI endpoints are integrated. Stress testing, settlement and the final secure role-provisioning workflow are still under development.</p>
+ </div>
  </section>;}

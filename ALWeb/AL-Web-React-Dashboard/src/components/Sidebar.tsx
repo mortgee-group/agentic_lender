@@ -1,5 +1,5 @@
 import type {PortalRole} from "../types/roles";
-export type Page="live-detail"|"new-application"|"portal"|"pipeline"|"files"|"file-detail"|"audit"|"stress"|"settlement"|"about";
+export type Page="system-status"|"live-detail"|"new-application"|"portal"|"pipeline"|"files"|"file-detail"|"audit"|"stress"|"settlement"|"about";
 type Link={page:Page;icon:string;label:string};
 const borrowerLinks:Link[]=[
  {page:"portal",icon:"▦",label:"Dashboard"},
@@ -29,6 +29,6 @@ export default function Sidebar({page,role,onNavigate}:{page:Page;role:PortalRol
     className={page===link.page||((page==="file-detail"||page==="live-detail")&&link.page==="files")?"active":""}
     onClick={()=>onNavigate(link.page)} aria-current={page===link.page?"page":undefined}>
     <span className="ico" aria-hidden="true">{link.icon}</span><span className="navtext">{link.label}</span></button>)}</nav>
-   <div className="sidebar-foot"><button className="link" type="button" onClick={()=>onNavigate("about")}>About the project</button><div>AL-Web · Mortgage portal</div></div>
+   <div className="sidebar-foot"><button className="link" type="button" onClick={()=>onNavigate("system-status")}>API connection status</button><button className="link" type="button" onClick={()=>onNavigate("about")}>About the project</button><div>AL-Web · Mortgage portal</div></div>
  </aside>;
 }

@@ -195,3 +195,24 @@ The details page presents the application's status, assessment, finance,
 property, assigned borrower UID and optional broker UID. Not-yet-assessed
 fields are clearly marked. It is separate from the pre-existing fictional
 Loan File Details page. No AI actions or updates are performed by viewing.
+
+## Live API dashboards and PR preparation
+
+The Borrower, Broker and Underwriter Dashboard, Pipeline and My Applications
+screens now use the authenticated `GET /applications` response, without
+showing fictional summary metrics or pipelines. All displayed totals, pending
+counts, high-risk counts and assessed counts are calculated from the user's
+AL-Core-permitted records. Empty responses remain empty.
+
+A dedicated **API connection status** link in the sidebar footer exposes
+the Firebase token, Firestore profile and backend role diagnostic panel.
+These diagnostics are removed from normal dashboard and application pages.
+
+Synthetic AI Audit examples and their fictional supporting file view remain
+available for development but are clearly labelled `SAMPLE DATA`. The
+header labels normal workspaces `LIVE AL-CORE`.
+
+The branch currently changes only
+`ALWeb/AL-Web-React-Dashboard/`. Before creating a PR, update it from
+`main`, run `npm ci`, `npm run build`, verify borrower/broker/underwriter
+workflows, and review development-only client-selected role provisioning.
