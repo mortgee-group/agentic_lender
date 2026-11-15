@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from app.firebase import db
 from app.models import (
@@ -79,10 +80,80 @@ def list_applications_for_user(
     else:
         return []
 
-    return [
-    LoanApplicationResponse(
-        **document.to_dict(),
-        applicationId=document.id,
-    )
-    for document in documents
-    ]
+    applications = []
+
+    for document in documents:
+        try:
+            application = LoanApplicationResponse(
+                **document.to_dict(),
+                applicationId=document.id,
+            )
+            applications.append(application)
+        except ValidationError:
+            # Older Firestore records may not match the current schema.
+            continue
+
+    return applications
+
+
+def save_ai_decision(
+    application_id: str,
+    decision_data: dict,
+) -> str:
+    """Save an AI decision and update the application atomically."""
+
+    now = datetime.now(timezone.utc)
+
+    decision_ref = db.collection("aiDecisions").document()
+    application_ref = db.collection("applications").document(application_id)
+
+    decision_record = {
+        "applicationId": application_id,
+        "finalLendingDecision": decision_data["decision"],
+        "creditMemorandum": decision_data.get("credit_memo"),
+        "reasoningLogs": decision_data.get("agent_trails", []),
+        "agentConsensus": decision_data.get("agent_outputs", {}),
+        "individualDecisionTrails": decision_data.get("agent_trails", []),
+        "createdAt": now,
+        # Preserve the complete AL-AI response for auditing.
+        "aiResponse": decision_data,
+    }
+
+    application_updates = {
+        "estimatedLTV": decision_data.get("estimatedLTV"),
+        "DTI": decision_data.get("DTI"),
+        "approvalLikelihood": decision_data.get("approvalLikelihood"),
+        "riskTier": decision_data.get("riskTier"),
+        "lifecycleStatus": "AI_DELIBERATED",
+        "updatedAt": now,
+    }
+
+    batch = db.batch()
+    batch.set(decision_ref, decision_record)
+    batch.update(application_ref, application_updates)
+    batch.commit()
+
+    return decision_ref.id
+
+
+def save_valuation(
+    application_id: str,
+    property_data: dict,
+    assessment_data: dict,
+) -> str:
+    """Save an AI property valuation to Firestore."""
+
+    now = datetime.now(timezone.utc)
+
+    valuation_ref = db.collection("valuations").document()
+
+    valuation_record = {
+        "applicationId": application_id,
+        "valuationPrediction": assessment_data["predicted_value"],
+        "valuationData": property_data,
+        "createdAt": now,
+    }
+
+    valuation_ref.set(valuation_record)
+
+    return valuation_ref.id

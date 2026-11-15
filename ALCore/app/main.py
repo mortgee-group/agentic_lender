@@ -4,11 +4,15 @@ from app.auth import verify_firebase_token
 from app.users import get_user_profile, create_user_profile
 from app.permissions import require_role
 from google.api_core.exceptions import AlreadyExists
+import httpx
 from datetime import datetime, timezone
+from app.ai_client import assess_application, underwrite_application
 from app.applications import (
     create_application,
     get_application,
     list_applications_for_user,
+    save_ai_decision,
+    save_valuation,
 )
 from app.models import (
     UserProfile,
@@ -200,3 +204,111 @@ def list_applications(
         uid=profile.uid,
         role=profile.role.value,
     )
+
+
+@app.post("/applications/{application_id}/assess")
+async def assess_mortgage_application(
+    application_id: str,
+    profile: UserProfile = Depends(
+        require_role(UserRole.BROKER, UserRole.UNDERWRITER)
+    ),
+):
+    application = get_application(application_id)
+
+    if application is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    if profile.role == UserRole.BROKER and application.brokerId != profile.uid:
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient permissions",
+        )
+
+    assessment_data = application.model_dump(
+        mode="json",
+        include={
+            "householdAnnualGrossIncome",
+            "existingDebtLiabilities",
+            "deposit",
+            "requestedMortgageTerm",
+            "sellerAskingPrice",
+            "property",
+        },
+    )
+
+    try:
+        assessment = await assess_application(assessment_data)
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503,
+            detail="AI assessment service is currently unavailable",
+    )
+    except httpx.HTTPStatusError:
+        raise HTTPException(
+            status_code=502,
+            detail="AI assessment service returned an error",
+    )
+
+    save_valuation(
+        application_id,
+        assessment_data["property"],
+        assessment,
+    )
+
+    return assessment
+
+
+@app.post("/applications/{application_id}/underwrite")
+async def underwrite_mortgage_application(
+    application_id: str,
+    profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER)),
+):
+    application = get_application(application_id)
+
+    if application is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    underwriting_data = application.model_dump(
+        mode="json",
+        include={
+            "borrowerId",
+            "brokerId",
+            "requestedLoanAmount",
+            "householdAnnualGrossIncome",
+            "existingDebtLiabilities",
+            "deposit",
+            "requestedMortgageTerm",
+            "sellerAskingPrice",
+            "property",
+        },
+    )
+
+    underwriting_data["applicationId"] = application_id
+
+    if not underwriting_data.get("requestedLoanAmount"):
+        underwriting_data["requestedLoanAmount"] = (
+            application.sellerAskingPrice - application.deposit
+        )
+
+    try:
+        decision = await underwrite_application(underwriting_data)
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503,
+            detail="AI underwriting service is currently unavailable",
+        )
+    except httpx.HTTPStatusError:
+        raise HTTPException(
+            status_code=502,
+            detail="AI underwriting service returned an error",
+        )
+
+    save_ai_decision(application_id, decision)
+
+    return decision
