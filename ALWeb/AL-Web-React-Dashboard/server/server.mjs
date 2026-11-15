@@ -10,7 +10,7 @@ const usersFile = join(dirname(fileURLToPath(import.meta.url)), "users.txt");
 const rolesFile = join(dirname(fileURLToPath(import.meta.url)), "demo-roles.json");
 async function roleFor(username) {
   const roles = JSON.parse(await readFile(rolesFile, "utf8"));
-  return roles[username] === "underwriter" ? "underwriter" : "broker";
+  return roles[username] === "borrower" ? "borrower" : roles[username] === "underwriter" ? "underwriter" : "broker";
 }
 const sessions = new Map(); // token -> username, kept in memory only
 const attempts = new Map(); // basic IP-based throttling, for local use only
