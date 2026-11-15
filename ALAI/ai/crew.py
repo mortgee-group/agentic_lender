@@ -2,7 +2,7 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 
-from ai.llms import get_cloud_llm_openai, get_cloud_llm_gemini, get_cloud_llm_groq, get_local_llm
+from ai.llms import get_cloud_llm_groq, get_local_llm
 from ai.tools import ValuationLookupTool
 from ai.models import UnderwritingDecision, AffordabilityOutput, ValuationOutput, MarketResearchOutput
 
@@ -26,7 +26,8 @@ class ALCrew:
     def valuation_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["valuation_agent"],
-            llm=get_cloud_llm_openai(),
+            #llm=get_cloud_llm_gemini(),
+            llm=get_cloud_llm_groq(),
             tools=[ValuationLookupTool()],
             verbose=True,
         )
@@ -35,7 +36,7 @@ class ALCrew:
     def market_researcher(self) -> Agent:
         return Agent(
             config=self.agents_config["market_researcher"],
-            llm=get_cloud_llm_openai(),
+            llm=get_cloud_llm_groq(),
             verbose=True,
         )
 
@@ -70,8 +71,10 @@ class ALCrew:
         return Task(
             config=self.tasks_config["valuation_task"],
             agent=self.valuation_agent(),
-            tools=[ValuationLookupTool()],
-            output_pydantic=ValuationOutput
+            expected_output=(
+                "A valuation report containing predicted_value, "
+                "overvaluation_pct, ltv, collateral_risk and notes."
+            ),
         )
 
     @task

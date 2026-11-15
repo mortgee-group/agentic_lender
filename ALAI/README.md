@@ -51,7 +51,6 @@ endpoints via `http://localhost:8000/docs`
 ```json
 {
     "ollama_reachable": true,
-    "openai_key_set": true,
     "gemini_key_set": true,
     "groq_key_set": true
 }
