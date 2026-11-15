@@ -114,3 +114,15 @@ Administrator-mediated assignment is required for privileged backend roles.
 
 The loan pipeline still uses fictional client-side application data. Nikoll's
 pending AI integration PR #18 is not required for this connectivity check.
+
+### Profile creation contract (AL-Core current main / deployed API)
+
+The AL-Core `POST /users/me` body requires `first_name`, `last_name` and
+`role` (optional `phone_number`). Earlier `display_name`-only requests
+return HTTP 422. The connection panel explicitly sends `role: "borrower"`
+and requests test first and last names rather than assuming the username
+is a real person's name. AL-Core persists the user profile in Firestore.
+
+AL-Core also currently allows client-selected broker and underwriter roles for
+**temporary testing**; the Web's Borrower profile action deliberately does not
+expose those role options. Role provisioning must be secured before deployment.

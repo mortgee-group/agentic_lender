@@ -12,6 +12,8 @@ export default function BackendStatus({user}:{user:AuthUser}) {
  const [roleStep,setRoleStep]=useState<Step>(pending);
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
+ const [firstName,setFirstName]=useState("");
+ const [lastName,setLastName]=useState("");
 
  const check=useCallback(async()=>{
   setHealth(pending);setIdentity(pending);setProfile(null);setProfileStep(pending);setRoleStep(pending);
@@ -48,7 +50,7 @@ export default function BackendStatus({user}:{user:AuthUser}) {
  async function provision(){
   setBusy(true);setNotice("");
   try{
-   await createBorrowerProfile(user.username);
+   await createBorrowerProfile(firstName,lastName);
    await check();
    setNotice("Borrower profile created in Firestore.");
   }catch(e){setNotice(e instanceof Error?e.message:"Profile creation failed");}
@@ -67,9 +69,20 @@ export default function BackendStatus({user}:{user:AuthUser}) {
    {profile?<> Verified AL-Core role: <strong>{profile.role}</strong>.</>:<> AL-Core permissions require a backend profile.</>}
    {" "}All displayed loan files are still fictional Web data.</p>
   {identity.state==="ok"&&profileStep.state==="missing"&&user.role==="borrower"&&
-   <div className="core-register"><p>This user has no backend profile. The button below writes a permanent Borrower profile to Firestore.</p>
-    <button type="button" className="btn secondary" disabled={busy} onClick={()=>void provision()}>{busy?"Creating…":"Create Borrower profile"}</button>
-   </div>}
+   <form className="core-register" onSubmit={event=>{event.preventDefault();void provision();}}>
+    <p>This account has no backend profile. Enter a fictional test name to create a persistent <strong>Borrower</strong> profile in Firestore.</p>
+    <div className="fields">
+     <div className="field"><label htmlFor="core-first-name">First name</label>
+      <input id="core-first-name" type="text" value={firstName} onChange={e=>setFirstName(e.target.value)}
+       minLength={1} maxLength={30} required disabled={busy} autoComplete="given-name"/></div>
+     <div className="field"><label htmlFor="core-last-name">Last name</label>
+      <input id="core-last-name" type="text" value={lastName} onChange={e=>setLastName(e.target.value)}
+       minLength={1} maxLength={50} required disabled={busy} autoComplete="family-name"/></div>
+    </div>
+    <button type="submit" className="btn secondary" disabled={busy||!firstName.trim()||!lastName.trim()}>
+     {busy?"Creating…":"Create Borrower profile"}
+    </button>
+   </form>}
   {notice&&<p role="status" className="core-note">{notice}</p>}
  </section>;
 }
