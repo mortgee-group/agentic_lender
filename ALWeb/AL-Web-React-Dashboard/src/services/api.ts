@@ -123,3 +123,38 @@ export const createCoreApplication = (data: CoreApplicationCreate) =>
 /** Fetch one application using AL-Core's own record-level permission check. */
 export const getCoreApplication = (applicationId: string) =>
  coreRequest<CoreApplication>(`/applications/${encodeURIComponent(applicationId)}`);
+
+/** The AL-Core AI routes forward responses from AL-AI.
+ * The assessment response is a valuation/affordability estimate; the
+ * underwriting response contains a decision and detailed audit output.
+ */
+export type AssessmentResponse = {
+ predicted_value: number;
+ overvaluation_pct: number;
+ ltv: number;
+ dti: number;
+ stress_tested_repayment: number;
+ max_borrowing_capacity: number;
+};
+export type UnderwritingResponse = {
+ applicationId: string;
+ decision: string;
+ rationale: string;
+ ltv: number;
+ dti: number;
+ risk_rating: number;
+ conditions: string[];
+ credit_memo: string;
+ agent_trails: string | unknown[];
+ agent_outputs: Record<string, unknown>;
+ estimatedLTV: number;
+ DTI: number;
+ approvalLikelihood: "High" | "Medium" | "Low";
+ riskTier: "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5";
+ lifecycleStatus: string;
+};
+/** These calls can persist AI results in Firestore; only invoke on direct user action. */
+export const requestCoreAssessment = (applicationId: string) =>
+ coreRequest<AssessmentResponse>(`/applications/${encodeURIComponent(applicationId)}/assess`,{method:"POST"});
+export const requestCoreUnderwriting = (applicationId: string) =>
+ coreRequest<UnderwritingResponse>(`/applications/${encodeURIComponent(applicationId)}/underwrite`,{method:"POST"});

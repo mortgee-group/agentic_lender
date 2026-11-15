@@ -216,3 +216,44 @@ The branch currently changes only
 `ALWeb/AL-Web-React-Dashboard/`. Before creating a PR, update it from
 `main`, run `npm ci`, `npm run build`, verify borrower/broker/underwriter
 workflows, and review development-only client-selected role provisioning.
+
+## AI integration stage 1 (feature/web-ai-integration)
+
+The live mortgage application detail page now offers explicit, confirmed
+AI operations backed by AL-Core:
+- **Run property assessment** is available for Broker and Underwriter roles
+  (`POST /applications/{id}/assess`). Broker access additionally requires
+  backend assignment to the particular application. This saves a valuation
+  to the shared Firestore project.
+- **Run AI underwriting** is visible only to Underwriter role
+  (`POST /applications/{id}/underwrite`). It saves an AI decision and updates
+  the application lifecycle. It may take considerably longer than valuation.
+
+These actions do not fire automatically. Results and backend errors appear
+inline. Only fictional development test records may be used. An AI
+recommendation is not a final lending approval. The underlying services must
+be deployed and configured; HTTP 502/503 may indicate AL-Core cannot reach
+AL-AI, not a React bug.
+
+Initial AI results are displayed as returned. A persistent structured audit
+view and workflow status transitions remain future milestones. All changes
+are confined to AL-Web.
+
+## AI response presentation (offline development)
+
+The live application detail page now includes **Preview example results
+(offline)** for Brokers and Underwriters. This toggles the same structured
+`AiResults` component used for real `POST /assess` and `POST /underwrite`
+responses; no API call is made and no Firestore document is written.
+
+Example response data is explicitly labelled **EXAMPLE DATA — NO AI
+INFERENCE** and does not represent the opened mortgage application or real
+market conditions. The component renders: ML valuation and affordability,
+AI recommendation, risk tiers, conditions, model-specific agent output,
+raw trail, and credit memorandum. Actual service results, when available,
+have a separate **AL-CORE API RESPONSE** label.
+
+The API currently provides these results directly after executing the
+POST operations. Persistent historical decision retrieval will require an
+authorised read endpoint in AL-Core; reloading the page does not restore
+the full detailed decision trail.

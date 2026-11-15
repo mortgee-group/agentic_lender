@@ -45,7 +45,7 @@ export default function App(){
  {page==="system-status"&&<><h1 className="page-title">AL-Core connection status</h1><p className="subtitle">Firebase authentication, backend profile and verified role access.</p><BackendStatus key={user.uid} user={user}/></>}
  {submissionMessage&&(page==="portal"||page==="files")&&<div className="notice" role="status">{submissionMessage}</div>}
  {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} dashboard={page==="portal"}/>}
- {page==="live-detail"&&selectedLiveId&&<LiveApplicationDetail key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} onBack={()=>navigate(liveReturnPage)}/>}
+ {page==="live-detail"&&selectedLiveId&&<LiveApplicationDetail key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} role={user.role} onBack={()=>navigate(liveReturnPage)}/>}
  {page==="new-application"&&user.role==="borrower"&&<NewMortgageApplication onSaved={onSubmitted} onCancel={()=>navigate("files")}/>}
  {page==="file-detail"&&(user.role==="borrower"?<BorrowerApplicationDetail application={selectedFile} onBack={()=>navigate("files")}/>:<LoanFileDetail application={selectedFile} role={user.role} onBack={()=>navigate("pipeline")} onOpenAudit={()=>selectedFile&&openAudit(selectedFile.id)}/>)}
  {page==="audit"&&user.role!=="borrower"&&<AIAuditConsole applications={visible} role={user.role} selectedId={selectedAuditId} onSelect={setSelectedAuditId} onViewFile={openFile}/>}
