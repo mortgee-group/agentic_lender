@@ -180,3 +180,18 @@ new document ID and refreshes the Live Applications panel in My Applications.
 The sample application tables remain separate and fictional. Sign in as the
 Underwriter to confirm the new application is visible through their API
 access. The Broker should not see the unassigned application (`brokerId=null`).
+
+## Live application details — GET /applications/{applicationId}
+
+Each row in the **Live mortgage applications** panel has **View details**.
+This opens a dedicated read-only page and requests the selected Firestore
+application from AL-Core using the current Firebase ID token. The API itself
+checks the verified role and record ownership; the client cannot bypass that
+by changing its demo role. A 403 or 404 is shown explicitly. The **Back**
+button returns to the Dashboard, My Applications or Pipeline page where the
+live record was opened.
+
+The details page presents the application's status, assessment, finance,
+property, assigned borrower UID and optional broker UID. Not-yet-assessed
+fields are clearly marked. It is separate from the pre-existing fictional
+Loan File Details page. No AI actions or updates are performed by viewing.

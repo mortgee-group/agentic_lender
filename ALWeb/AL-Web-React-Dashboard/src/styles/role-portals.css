@@ -15,3 +15,11 @@
 .live-applications-footer{padding:11px 24px 18px;margin:0!important;font-size:11px!important;color:var(--muted)}
 
 .new-core-application{max-width:860px}.new-core-application .subhead{font-size:13px}.core-form-calculated{margin:18px 0!important;font-size:13px!important}.core-form-error{margin-top:20px}.new-core-application .form-actions{flex-wrap:wrap}
+
+/* Live application detail view is independent of fictional loan detail screens. */
+.live-detail-actions{display:flex;flex-wrap:wrap;gap:10px}
+.live-detail-sections{display:grid;gap:18px}
+.live-detail .detail-columns{align-items:start}
+.live-detail .detail-row strong{overflow-wrap:anywhere;min-width:0}
+.live-detail .panel h2{margin:0 0 14px}
+@media(max-width:630px){.live-detail-actions{width:100%}}

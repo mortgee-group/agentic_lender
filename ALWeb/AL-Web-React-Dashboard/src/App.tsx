@@ -5,6 +5,7 @@ import Sidebar,{type Page} from "./components/Sidebar";
 import Header from "./components/Header";
 import BackendStatus from "./components/BackendStatus";
 import LiveApplications from "./components/LiveApplications";
+import LiveApplicationDetail from "./pages/LiveApplicationDetail";
 import NewMortgageApplication from "./pages/NewMortgageApplication";
 import RoleDashboard from "./pages/RoleDashboard";
 import BorrowerDashboard from "./pages/BorrowerDashboard";
@@ -15,26 +16,29 @@ import AIAuditConsole from "./pages/AIAuditConsole";
 import PortalPlaceholder,{type PortalFeature} from "./pages/PortalPlaceholder";
 import About from "./pages/About";
 import {sampleApplications,visibleApplications} from "./data/sampleApplications";
-const labels:Record<Page,string>={"new-application":"New Mortgage Application",portal:"Dashboard",pipeline:"Loan Pipeline",files:"Loan Files","file-detail":"Loan File Details",audit:"AI Audit & Deliberation",stress:"Stress Testing",settlement:"Settlement & Export",about:"About Agentic Lender"};
+const labels:Record<Page,string>={"live-detail":"Live Application Details","new-application":"New Mortgage Application",portal:"Dashboard",pipeline:"Loan Pipeline",files:"Loan Files","file-detail":"Loan File Details",audit:"AI Audit & Deliberation",stress:"Stress Testing",settlement:"Settlement & Export",about:"About Agentic Lender"};
 const features:PortalFeature[]=["stress","settlement"];
 export default function App(){
  const [authStatus,setAuthStatus]=useState<"checking"|"guest"|"authenticated">("checking");
  const [user,setUser]=useState<AuthUser|null>(null);
  const [page,setPage]=useState<Page>("portal");
  const [selectedFileId,setSelectedFileId]=useState<string|null>(null);
+ const [selectedLiveId,setSelectedLiveId]=useState<string|null>(null);
+ const [liveReturnPage,setLiveReturnPage]=useState<Page>("files");
  const [selectedAuditId,setSelectedAuditId]=useState<string|null>(null);
  const [liveRefresh,setLiveRefresh]=useState(0);
  const [submissionMessage,setSubmissionMessage]=useState("");
  useEffect(()=>{let active=true;getCurrentUser().then(u=>{if(!active)return;setUser(u);setAuthStatus(u?"authenticated":"guest");}).catch(()=>{if(active)setAuthStatus("guest");});return ()=>{active=false;};},[]);
- const handleLogin=(u:AuthUser)=>{setSubmissionMessage("");setLiveRefresh(0);setUser(u);setPage("portal");setSelectedFileId(null);setSelectedAuditId(null);setAuthStatus("authenticated");};
+ const handleLogin=(u:AuthUser)=>{setSubmissionMessage("");setLiveRefresh(0);setUser(u);setPage("portal");setSelectedFileId(null);setSelectedLiveId(null);setSelectedAuditId(null);setAuthStatus("authenticated");};
  const handleLogout=async()=>{try{await logoutRequest();}catch(e){console.error("Logout failed",e);return;}setSubmissionMessage("");setLiveRefresh(0);setUser(null);setAuthStatus("guest");setPage("portal");setSelectedFileId(null);setSelectedAuditId(null);};
  const navigate=(next:Page)=>{
-  if(user?.role==="borrower"&&!["portal","files","file-detail","about","new-application"].includes(next))return;
+  if(user?.role==="borrower"&&!["portal","files","file-detail","live-detail","about","new-application"].includes(next))return;
   if(user?.role==="broker"&&(next==="stress"||next==="settlement"))return;
   setPage(next);window.scrollTo(0,0);
  };
  const onSubmitted=(id:string)=>{setSubmissionMessage(`Application ${id} created in Firestore.`);setLiveRefresh(v=>v+1);navigate("files");};
  const visible=user?visibleApplications(user.role,user.username,sampleApplications):[];
+ const openLive=(id:string)=>{setSelectedLiveId(id);setLiveReturnPage(page==="portal"||page==="pipeline"||page==="files"?page:"files");navigate("live-detail");};
  const openFile=(id:string)=>{if(!visible.some(a=>a.id===id))return;setSelectedFileId(id);navigate("file-detail");};
  const openAudit=(id?:string)=>{if(user?.role==="borrower")return;if(id&&!visible.some(a=>a.id===id))return;setSelectedAuditId(id??null);navigate("audit");};
  if(authStatus==="checking")return <div className="auth-shell"><div className="auth-card panel" role="status">Checking login session…</div></div>;
@@ -42,7 +46,8 @@ export default function App(){
  const selectedFile=visible.find(a=>a.id===selectedFileId)??null;
  return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout}/><div className="content"><BackendStatus key={user.uid} user={user}/>
  {submissionMessage&&<div className="notice" role="status">{submissionMessage}</div>}
- {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user}/>}
+ {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive}/>}
+ {page==="live-detail"&&selectedLiveId&&<LiveApplicationDetail key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} onBack={()=>navigate(liveReturnPage)}/>}
  {page==="new-application"&&user.role==="borrower"&&<NewMortgageApplication onSaved={onSubmitted} onCancel={()=>navigate("files")}/>}
  {page==="portal"&&(user.role==="borrower"?<BorrowerDashboard username={user.username} applications={visible} onOpenApplications={()=>navigate("files")} onOpenFile={openFile}/>:<RoleDashboard role={user.role} username={user.username} onOpenPipeline={()=>navigate("pipeline")} onOpenFile={openFile} onOpenAudit={()=>openAudit()}/>)}
  {page==="files"&&user.role==="borrower"&&<BorrowerDashboard username={user.username} applications={visible} onOpenApplications={()=>navigate("files")} onOpenFile={openFile} listOnly/>}

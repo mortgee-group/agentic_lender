@@ -12,7 +12,7 @@ const riskDescription=(tier:CoreApplication["riskTier"])=>{
 };
 const date = (value:string|null) => value?value.slice(0,10):"—";
 
-export default function LiveApplications({user}:{user:AuthUser}){
+export default function LiveApplications({user,onOpenApplication}:{user:AuthUser;onOpenApplication:(id:string)=>void}){
  const [records,setRecords]=useState<CoreApplication[]>([]);
  const [status,setStatus]=useState<"loading"|"loaded"|"error">("loading");
  const [error,setError]=useState("");
@@ -50,7 +50,7 @@ export default function LiveApplications({user}:{user:AuthUser}){
   {status==="loaded"&&records.length>0&&<>
    <p className="live-applications-count" role="status">{records.length} application{records.length===1?"":"s"} returned by AL-Core</p>
    <div className="table-wrap"><table>
-    <thead><tr><th>Application ID</th><th>County</th><th>Requested</th><th>LTV</th><th>Risk</th><th>Approval likelihood</th><th>Status</th><th>Submitted</th></tr></thead>
+    <thead><tr><th>Application ID</th><th>County</th><th>Requested</th><th>LTV</th><th>Risk</th><th>Approval likelihood</th><th>Status</th><th>Submitted</th><th>Details</th></tr></thead>
     <tbody>{records.map(item=><tr key={item.applicationId}>
      <td className="strong">{item.applicationId}</td>
      <td>{item.property?.county??"—"}</td>
@@ -60,6 +60,8 @@ export default function LiveApplications({user}:{user:AuthUser}){
      <td>{item.approvalLikelihood??"Not assessed"}</td>
      <td>{item.lifecycleStatus}</td>
      <td>{date(item.submittedAt)}</td>
+     <td><button type="button" className="link" onClick={()=>onOpenApplication(item.applicationId)}
+      aria-label={`View live application ${item.applicationId}`}>View details →</button></td>
     </tr>)}</tbody>
    </table></div>
   </>}

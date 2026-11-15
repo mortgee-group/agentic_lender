@@ -78,11 +78,18 @@ export type CoreApplication = {
   property_type: string;
   ber_rating: string;
  };
+ householdAnnualGrossIncome: number;
+ existingDebtLiabilities: number;
+ deposit: number;
+ requestedMortgageTerm: number;
+ sellerAskingPrice: number;
  requestedLoanAmount: number | null;
  estimatedLTV: number | null;
  riskTier: "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5" | null;
  approvalLikelihood: "High" | "Medium" | "Low" | null;
  lifecycleStatus: "APPLIED" | "AI_DELIBERATED" | "UNDERWRITER_APPROVED" | "FUNDED" | "CLOSED";
+ createdAt: string;
+ updatedAt: string;
  submittedAt: string | null;
 };
 export async function getCoreApplications(): Promise<CoreApplication[]> {
@@ -112,3 +119,7 @@ export const createCoreApplication = (data: CoreApplicationCreate) =>
  coreRequest<{applicationId:string;message:string}>("/applications",{
   method:"POST",body:JSON.stringify(data),
  });
+
+/** Fetch one application using AL-Core's own record-level permission check. */
+export const getCoreApplication = (applicationId: string) =>
+ coreRequest<CoreApplication>(`/applications/${encodeURIComponent(applicationId)}`);
