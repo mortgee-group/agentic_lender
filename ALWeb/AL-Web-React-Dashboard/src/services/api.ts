@@ -49,13 +49,17 @@ export const verifyCoreAuthentication = () => coreRequest<{uid:string}>("/auth/m
 export const getCoreProfile = () => coreRequest<CoreProfile>("/users/me");
 export const getCoreRoleAccess = (role: PortalRole) =>
  coreRequest<{uid:string;role:PortalRole;message:string}>(`/${role}/dashboard`);
-/** Use the current AL-Core user-registration contract; role is intentionally borrower here. */
-export const createBorrowerProfile = (firstName: string, lastName: string) =>
+/**
+ * Temporary AL-Core development registration contract. Backend currently
+ * accepts a selected role; this must be restricted before production.
+ * Never take a role from an arbitrary request when authorising data access.
+ */
+export const createCoreProfile = (firstName: string, lastName: string, role: PortalRole) =>
  coreRequest<CoreProfile>("/users/me", {
   method: "POST",
   body: JSON.stringify({
    first_name: firstName.trim(),
    last_name: lastName.trim(),
-   role: "borrower",
+   role,
   }),
  });

@@ -106,11 +106,12 @@ An authenticated `/auth/me` result with matching UID proves that AL-Core accepts
 Firebase credentials. `404` from `/users/me` means a Firestore profile is missing,
 not that authentication failed. `403` means access is denied by backend permissions.
 
-If a Borrower demo account has no backend profile, the panel offers an explicit
-**Create Borrower profile** button using `POST /users/me`. This writes a real
-Firestore profile. AL-Core deliberately provisions only Borrower users through
-this route, even if registration's demo dropdown selected Broker or Underwriter.
-Administrator-mediated assignment is required for privileged backend roles.
+If a demo account has no backend profile, the connection panel offers an explicit
+**Create {role} profile** action using `POST /users/me`. This writes a real Firestore
+profile and uses the logged-in user's selected demo role. The current AL-Core
+backend permits client-selected Borrower, Broker and Underwriter roles for
+**development testing only**. This is not suitable for production: unauthorised
+role selection must be disabled or replaced with trusted role provisioning.
 
 The loan pipeline still uses fictional client-side application data. Nikoll's
 pending AI integration PR #18 is not required for this connectivity check.
@@ -119,10 +120,23 @@ pending AI integration PR #18 is not required for this connectivity check.
 
 The AL-Core `POST /users/me` body requires `first_name`, `last_name` and
 `role` (optional `phone_number`). Earlier `display_name`-only requests
-return HTTP 422. The connection panel explicitly sends `role: "borrower"`
-and requests test first and last names rather than assuming the username
-is a real person's name. AL-Core persists the user profile in Firestore.
+return HTTP 422. The connection panel sends the selected demo role and requests test first and
+last names rather than assuming the username is a real person's name. AL-Core persists the user profile in Firestore.
 
-AL-Core also currently allows client-selected broker and underwriter roles for
-**temporary testing**; the Web's Borrower profile action deliberately does not
-expose those role options. Role provisioning must be secured before deployment.
+AL-Core currently accepts the three client-selected roles for **temporary testing**;
+the Web profile form supports all three and labels privileged provisioning
+accordingly. Role provisioning must be secured before deployment.
+
+### Broker / Underwriter profile test
+
+1. Log out of Borrower and sign in using an existing Broker or Underwriter
+   Firebase development account.
+2. Confirm backend health and Firebase token verification succeed, and that
+   profile lookup returns HTTP 404 (if unprovisioned).
+3. Enter fictional first and last names and explicitly create the profile.
+4. Confirm the backend profile role and the matching role-specific dashboard
+   permission are shown as successful.
+5. Verify the `users/{uid}` document in Firestore and repeat for the other role.
+
+Do not provision privileged test profiles for real users or deploy public self-
+registration without backend-admin controls.
