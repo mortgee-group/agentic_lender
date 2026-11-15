@@ -4,9 +4,9 @@ This document explains how AL-Mobile, AL-Web, and AL-AI can integrate with the A
 
 ## 1. API Base URL
 
-The backend is deployed on Google Cloud Run.
+The backend is deployed on Google Cloud Run. Local development uses `http://127.0.0.1:8000`; the deployed service is not yet verified for end-to-end AL-AI integration.
 
-**Production API:**
+**Deployed development API:**
 
 https://agentic-lender-525895646792.europe-west2.run.app
 
@@ -14,7 +14,7 @@ https://agentic-lender-525895646792.europe-west2.run.app
 
 https://agentic-lender-525895646792.europe-west2.run.app/docs
 
-All API endpoints use the production base URL.
+Use the deployed base URL for cloud testing or `http://127.0.0.1:8000` for local testing. AL-Web currently configures `VITE_API_BASE_URL=http://127.0.0.1:8000` locally.
 
 For example:
 
@@ -72,14 +72,6 @@ Registers a user profile after the user has authenticated with Firebase.
 
 **Authentication:** Required (Firebase ID token)
 
-**Request body:**
-
-```json
-{
-  "display_name": "John Smith"
-}
-```
-
 **Important:**
 - The user's UID and email are obtained from their verified Firebase token.
 - New users are registered with the `borrower` role.
@@ -100,9 +92,16 @@ Returns the authenticated user's Firestore profile.
   "uid": "firebase-user-123",
   "email": "john@example.com",
   "role": "borrower",
-  "display_name": "John Smith"
+  "display_name": "John Smith",
+  "first_name": "John",
+  "last_name": "Smith",
+  "phone_number": "+353871234567",
+  "createdAt": "2026-11-15T12:00:00Z",
+  "updatedAt": "2026-11-15T12:00:00Z"
 }
 ```
+
+**Additional Firestore user fields:** Existing `users` documents have also been observed with `first_name`, `last_name`, `phone_number`, `createdAt`, and `updatedAt` (in addition to the four fields above). The example is intentionally minimal: verify `UserProfile` in `app/models.py` or local `/openapi.json` before assuming all nine Firestore fields are exposed by `GET /users/me` or accepted by `POST /users/me`.
 
 ### GET /auth/me
 
@@ -145,13 +144,13 @@ Creates a new mortgage application.
   "requestedMortgageTerm": 30,
   "sellerAskingPrice": 350000,
   "property": {
-    "location": "Kilkenny City",
     "county": "Kilkenny",
-    "floorArea": 115,
-    "floorAreaUnit": "SQ_METERS",
+    "floor_area": 115,
     "bedrooms": 3,
-    "propertyType": "SEMI_DETACHED",
-    "berEnergyRating": "B2"
+    "bathrooms": 2,
+    "year_built": 2010,
+    "property_type": "SEMI_DETACHED",
+    "ber_rating": "B2"
   }
 }
 ```
@@ -165,13 +164,13 @@ Creates a new mortgage application.
 | `deposit` | Deposit amount. Must be 0 or greater. |
 | `requestedMortgageTerm` | Requested mortgage term in years. Must be greater than 0. |
 | `sellerAskingPrice` | Property asking price. Must be greater than 0. |
-| `property.location` | Property location. Cannot be empty. |
 | `property.county` | County where the property is located. Cannot be empty. |
-| `property.floorArea` | Property floor area. Must be greater than 0. |
-| `property.floorAreaUnit` | Must be `SQ_METERS`. |
+| `property.floor_area` | Property floor area. |
 | `property.bedrooms` | Number of bedrooms. Must be 0 or greater. |
-| `property.propertyType` | Property type. See supported values below. |
-| `property.berEnergyRating` | Optional BER energy rating. |
+| `property.property_type` | Property type. See supported values below. |
+| `property.ber_rating` | BER energy rating. |
+| `property.bathrooms` | Number of bathrooms. |
+| `property.year_built` | Year the property was built. |
 
 ### Supported Property Types
 
@@ -181,7 +180,7 @@ Creates a new mortgage application.
 
 `A1`, `A2`, `A3`, `B1`, `B2`, `B3`, `C1`, `C2`, `C3`, `D1`, `D2`, `E1`, `E2`, `F`, `G`, `EXEMPT`
 
-The `berEnergyRating` field can also be `null`.
+Check the current `PropertyDetails` schema in `/docs` for optional fields and accepted enum values.
 
 ### Successful Response
 
@@ -212,7 +211,7 @@ AL-Core generates or assigns these fields.
 
 New applications begin with the lifecycle status `APPLIED`.
 
-**Important:** Creating an application does not automatically trigger AI underwriting. AI processing will require a separate integration.
+**Important:** Creating an application does not automatically trigger AI underwriting. An authorized user must call the separate `/assess` or `/underwrite` endpoint.
 
 ## 5. Retrieving Mortgage Applications
 
@@ -258,7 +257,7 @@ Returns mortgage applications accessible to the authenticated user.
       "propertyType": "SEMI_DETACHED",
       "berEnergyRating": "B2"
     },
-    "requestedLoanAmount": null,
+    "requestedLoanAmount": 280000,
     "estimatedLTV": null,
     "DTI": null,
     "approvalLikelihood": null,
@@ -349,57 +348,24 @@ When a borrower creates an application using `POST /applications`, AL-Core autom
 
 ### Current Implementation
 
-AL-Core currently supports creating and retrieving mortgage applications.
+Applications start at `APPLIED`. After a successful call to `POST /applications/{application_id}/underwrite`, AL-Core saves the AI decision and updates the application to `AI_DELIBERATED` in one Firestore batch. This transition has been verified locally. Human approval, funding, closing, and general-purpose status-transition endpoints have not been verified.
 
-The lifecycle statuses are defined in the backend, but **API endpoints for changing application statuses have not yet been implemented**.
+### AI Valuation and Underwriting Endpoints
 
-Therefore:
+| Method | Endpoint | Allowed roles | Purpose |
+|---|---|---|---|
+| POST | `/applications/{application_id}/assess` | `broker` (assigned application), `underwriter` | Requests AL-AI valuation and saves a record in `valuations`. |
+| POST | `/applications/{application_id}/underwrite` | `underwriter` | Runs the AL-AI underwriting committee and saves a decision in `aiDecisions`. |
 
-- AL-Mobile and AL-Web can display the current application status.
-- Clients cannot currently update the status through the API.
-- AL-AI cannot yet submit underwriting results through a dedicated endpoint.
-- Underwriter approval and funding workflows require additional backend development.
+Both endpoints require a Firebase ID token. AL-Core retrieves the application by ID and builds the AL-AI request; clients do **not** submit the mortgage financial/property fields again in the endpoint body.
 
-### Planned Integration
+**Assessment response:** `predicted_value`, `overvaluation_pct`, `ltv`, `dti`, `stress_tested_repayment`, and `max_borrowing_capacity`. The `valuations` document stores `applicationId`, `valuationPrediction` (from `predicted_value`), `valuationData` (property details), and `createdAt`; the other returned metrics are not currently saved by `save_valuation()`.
 
-Future backend functionality will support:
+**Underwriting response:** Includes `decision`, `rationale`, `ltv`, `dti`, `risk_rating`, `conditions`, `credit_memo`, `agent_trails`, `agent_outputs`, `estimatedLTV`, `DTI`, `approvalLikelihood`, `riskTier`, and `lifecycleStatus`. AL-Core stores the complete response for auditing alongside the lending decision, credit memorandum and agent outputs. It updates `estimatedLTV`, `DTI`, `approvalLikelihood`, `riskTier`, `lifecycleStatus` (`AI_DELIBERATED`) and `updatedAt` on the application.
 
-1. Recording AI underwriting results.
-2. Updating application lifecycle statuses.
-3. Restricting status changes to authorised roles.
-4. Validating allowed status transitions.
+If AL-AI cannot be reached, AL-Core returns `503`; if AL-AI returns an unsuccessful HTTP status, AL-Core returns `502`. Application access and role restrictions still apply.
 
-**Important:** These features are planned, not currently available. Frontend teams should not assume that status update endpoints exist.
-
-## 7. Integration Notes for Development Teams
-
-### AL-Mobile (Kotlin)
-
-- Use Firebase Authentication to sign users in.
-- Obtain a Firebase ID token before calling protected endpoints.
-- Include the token in the `Authorization` header.
-- Use `POST /applications` to submit mortgage applications.
-- Use `GET /applications` to display the user's applications.
-- Use `GET /applications/{application_id}` to display application details.
-
-### AL-Web (React)
-
-- Use Firebase Authentication for sign-in.
-- Retrieve the user's profile using `GET /users/me`.
-- Display navigation and features according to the user's role.
-- Use the application GET endpoints for dashboards and application details.
-- Handle `401`, `403`, and `404` responses appropriately.
-
-### AL-AI (Underwriting)
-
-- Mortgage application data is stored in Firestore.
-- Application records contain financial information, property details, and lifecycle status.
-- AI-related fields include `approvalLikelihood`, `riskTier`, `DTI`, and `estimatedLTV`.
-- These fields may initially contain `null`.
-- An authenticated API endpoint for submitting AI underwriting results has not yet been implemented.
-- The AL-AI and AL-Core must agree on the integration method and underwriting result format before implementation.
-
-## 8. API Development Status
+## API Development Status
 
 | Feature | Status |
 |---|---|
@@ -409,10 +375,10 @@ Future backend functionality will support:
 | Mortgage application creation | Implemented |
 | Mortgage application retrieval | Implemented |
 | Firestore persistence | Implemented |
-| Cloud Run deployment | Implemented |
-| AI underwriting integration | Planned |
-| Application status updates | Planned |
-| Underwriter approval workflow | Planned |
+| AL-Core Cloud Run deployment | Implemented; deployed AI integration not yet verified |
+| Authenticated AI HTTP endpoints and AL-Web browser flow | Not yet tested end-to-end |
+| AI valuation and underwriting integration | Implemented; locally tested |
+| `APPLIED` → `AI_DELIBERATED` update | Implemented; locally tested |
 
 ## 9. API Documentation
 
@@ -420,4 +386,4 @@ For the latest available endpoints, request schemas, and response schemas, consu
 
 https://agentic-lender-525895646792.europe-west2.run.app/docs
 
-This integration guide describes the currently implemented API and identifies functionality planned for future development.
+This integration guide describes the implemented API, locally verified integrations, and functionality still requiring testing or development.
