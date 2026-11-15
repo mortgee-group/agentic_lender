@@ -37,7 +37,6 @@ export default function App(){
  const visible=user?visibleApplications(user.role,user.username,sampleApplications):[];
  const openLive=(id:string)=>{setSelectedLiveId(id);setLiveReturnPage(page==="portal"||page==="pipeline"||page==="files"?page:"files");navigate("live-detail");};
  const openFile=(id:string)=>{if(!visible.some(a=>a.id===id))return;setSelectedFileId(id);navigate("file-detail");};
- const openAudit=(id?:string)=>{if(user?.role==="borrower")return;if(id&&!visible.some(a=>a.id===id))return;setSelectedAuditId(id??null);navigate("audit");};
  if(authStatus==="checking")return <div className="auth-shell"><div className="auth-card panel" role="status">Checking login session…</div></div>;
  if(authStatus==="guest"||!user)return <Login onLogin={handleLogin}/>;
  const selectedFile=visible.find(a=>a.id===selectedFileId)??null;
