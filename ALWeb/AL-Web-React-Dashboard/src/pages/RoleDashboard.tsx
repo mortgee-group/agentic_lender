@@ -1,4 +1,3 @@
-import BackendStatus from "../components/BackendStatus";
 import SummaryCard from "../components/SummaryCard";
 import {visibleApplications,sampleApplications,type LoanApplication} from "../data/sampleApplications";
 import {euro} from "../utils/loanCalculations";
@@ -13,7 +12,6 @@ export default function RoleDashboard({role,username,onOpenPipeline,onOpenFile,o
    <h1 className="page-title">{role==="broker"?"Broker Dashboard":"Underwriter Dashboard"}</h1>
    <p className="subtitle">{role==="broker"?"Track your referred client loan applications.":"Review portfolio risk, decisions and underwriting activity."}</p>
   </div><span className="status demo">Fictional applications</span></div>
-  <BackendStatus/>
   <div className="grid3 portal-metrics">
    <SummaryCard title={role==="broker"?"Assigned Applications":"Portfolio Applications"} icon="▤" value={visible.length} note="Example applications"/>
    <SummaryCard title="Awaiting Decision" icon="⌁" value={visible.filter(a=>a.status==="Applied"||a.status==="AI Deliberated").length} note="Fictional lifecycle statuses"/>

@@ -91,3 +91,26 @@ application data. Disable or restrict self-registration before public deployment
 
 The next milestone is secure role provisioning with trusted backend-verified
 profiles and properly protected data access.
+
+## AL-Core Firebase-authenticated connectivity smoke test
+
+An AL-Core connection panel appears after sign-in on every demo dashboard. It checks
+`GET /health`, `GET /auth/me`, `GET /users/me`, and — when a backend profile exists —
+the role-specific `GET /{role}/dashboard` endpoint. All protected calls send the Firebase
+ID token as an Authorization Bearer header; never log or share the token.
+
+The default backend URL is the documented Cloud Run development service. Override
+`VITE_API_BASE_URL` in your local ignored `.env.local` if required and restart Vite.
+
+An authenticated `/auth/me` result with matching UID proves that AL-Core accepts your
+Firebase credentials. `404` from `/users/me` means a Firestore profile is missing,
+not that authentication failed. `403` means access is denied by backend permissions.
+
+If a Borrower demo account has no backend profile, the panel offers an explicit
+**Create Borrower profile** button using `POST /users/me`. This writes a real
+Firestore profile. AL-Core deliberately provisions only Borrower users through
+this route, even if registration's demo dropdown selected Broker or Underwriter.
+Administrator-mediated assignment is required for privileged backend roles.
+
+The loan pipeline still uses fictional client-side application data. Nikoll's
+pending AI integration PR #18 is not required for this connectivity check.

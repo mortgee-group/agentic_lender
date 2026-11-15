@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import {getCurrentUser,logout as logoutRequest,type AuthUser} from "./services/auth";
 import Sidebar,{type Page} from "./components/Sidebar";
 import Header from "./components/Header";
+import BackendStatus from "./components/BackendStatus";
 import RoleDashboard from "./pages/RoleDashboard";
 import BorrowerDashboard from "./pages/BorrowerDashboard";
 import BorrowerApplicationDetail from "./pages/BorrowerApplicationDetail";
@@ -34,7 +35,7 @@ export default function App(){
  if(authStatus==="checking")return <div className="auth-shell"><div className="auth-card panel" role="status">Checking login session…</div></div>;
  if(authStatus==="guest"||!user)return <Login onLogin={handleLogin}/>;
  const selectedFile=visible.find(a=>a.id===selectedFileId)??null;
- return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout}/><div className="content">
+ return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout}/><div className="content"><BackendStatus key={user.uid} user={user}/>
  {page==="portal"&&(user.role==="borrower"?<BorrowerDashboard username={user.username} applications={visible} onOpenApplications={()=>navigate("files")} onOpenFile={openFile}/>:<RoleDashboard role={user.role} username={user.username} onOpenPipeline={()=>navigate("pipeline")} onOpenFile={openFile} onOpenAudit={()=>openAudit()}/>)}
  {page==="files"&&user.role==="borrower"&&<BorrowerDashboard username={user.username} applications={visible} onOpenApplications={()=>navigate("files")} onOpenFile={openFile} listOnly/>}
  {(page==="pipeline"||page==="files")&&user.role!=="borrower"&&<LoanPipeline key={page+user.username} applications={visible} role={user.role} mode={page} onOpenFile={openFile}/>}
