@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from config import RF_MODEL_PATH, KNN_MODEL_PATH
 from ai import ALCrew
-from ai.models import UnderwritingDecision
+from ai.models import UnderwritingDecision, ValuationOutput
 from app.stress_test import StressTestRequest, StressTestResponse, run_stress_test
 
 # ----- Load models once at startup -----
@@ -248,8 +248,20 @@ async def underwrite(request: UnderwriteRequest):
     if len(task_outputs) >= 3:
         if task_outputs[0].pydantic is not None:
             agent_outputs["affordability"] = task_outputs[0].pydantic.model_dump()
-        if task_outputs[1].pydantic is not None:
-            agent_outputs["valuation"] = task_outputs[1].pydantic.model_dump()
+        try:
+            raw_valuation=task_outputs[1].raw.strip()
+
+            if raw_valuation.startswith("````"):
+                raw_valuation = raw_valuation.split("\n", 1)[1]
+                raw_valuation = raw_valuation.rsplit("````", 1)[0].strip()
+
+            valuation = ValuationOutput.model_validate_json(raw_valuation)
+            agent_outputs["valuation"] = valuation.model_dump()
+        except ValueError as e:
+                raise HTTPException(status_code=422, detail=f"Invalid valuation agent output: {e}")
+
+           
+
         if task_outputs[2].pydantic is not None:
             agent_outputs["market_research"] = task_outputs[2].pydantic.model_dump()
 
@@ -297,8 +309,8 @@ async def ai_health():
 
     return {
         "ollama_reachable": ollama_ok,
-        "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
-        "gemini_key_set": bool(os.getenv("GEMINI_API_KEY")),
+    
+       # "gemini_key_set": bool(os.getenv("GEMINI_API_KEY")),
         "groq_key_set": bool(os.getenv("GROQ_API_KEY")),
     }
 
