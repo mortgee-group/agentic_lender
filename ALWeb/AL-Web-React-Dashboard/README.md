@@ -140,3 +140,25 @@ accordingly. Role provisioning must be secured before deployment.
 
 Do not provision privileged test profiles for real users or deploy public self-
 registration without backend-admin controls.
+
+## Live mortgage application retrieval (read-only)
+
+On the Dashboard, Loan Files and Pipeline pages, **Live mortgage applications**
+calls `GET /applications` with the signed-in Firebase ID token. This is a
+separate panel above the existing fictional sample dashboard. It never
+substitutes sample data when the API returns an empty list.
+
+AL-Core filters applications according to the **verified backend Firestore
+profile**, not the UI-only selected role. Borrowers only receive their own
+applications, brokers receive applications whose `brokerId` matches their UID,
+and underwriters receive all accessible applications.
+
+Click **Refresh** to re-fetch. Missing application records appear as a genuine
+empty state; API errors including HTTP 403 are displayed instead of showing
+synthetic records. A missing `riskTier` or `approvalLikelihood` is displayed
+as **Not assessed**. The backend's Tier 1 (lowest risk) through Tier 5
+(highest risk) nomenclature is retained.
+
+The existing fictional pipeline and detail views are not yet wired to the
+real application IDs. The next step is `GET /applications/{applicationId}`,
+then Borrower `POST /applications`; do not open a demo file using a real ID.

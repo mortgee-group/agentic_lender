@@ -63,3 +63,30 @@ export const createCoreProfile = (firstName: string, lastName: string, role: Por
    role,
   }),
  });
+
+/** Current AL-Core GET /applications response; fields may be null until AI analysis. */
+export type CoreApplication = {
+ applicationId: string;
+ borrowerId: string;
+ brokerId: string | null;
+ property: {
+  county: string;
+  floor_area: number;
+  bedrooms: number;
+  bathrooms: number;
+  year_built: number;
+  property_type: string;
+  ber_rating: string;
+ };
+ requestedLoanAmount: number | null;
+ estimatedLTV: number | null;
+ riskTier: "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5" | null;
+ approvalLikelihood: "High" | "Medium" | "Low" | null;
+ lifecycleStatus: "APPLIED" | "AI_DELIBERATED" | "UNDERWRITER_APPROVED" | "FUNDED" | "CLOSED";
+ submittedAt: string | null;
+};
+export async function getCoreApplications(): Promise<CoreApplication[]> {
+ const data = await coreRequest<unknown>("/applications");
+ if (!Array.isArray(data)) throw new Error("AL-Core returned an unexpected applications format (expected an array).");
+ return data as CoreApplication[];
+}
