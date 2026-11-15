@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import SummaryCard from "../components/SummaryCard";
 import RecentValuations from "../components/RecentValuations";
 import type { PropertyRecord } from "../types/property";
-import BackendStatus from "../components/BackendStatus";
 
 export type QuickProperty = { address: string; type: string };
 type Props = { records: PropertyRecord[]; onNewValuation: (quick?: QuickProperty) => void; onInsights: () => void; onHistory: () => void; onViewRecord: (r: PropertyRecord) => void };
@@ -33,9 +32,6 @@ export default function Dashboard({records, onNewValuation, onInsights, onHistor
         ＋ Start New Valuation
       </button>
     </div>
-
-    {/* AL-Core Backend Connection Status */}
-    <BackendStatus />
 
     <div className="grid3">
 
