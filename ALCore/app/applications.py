@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from app.firebase import db
 from app.models import (
@@ -79,13 +80,20 @@ def list_applications_for_user(
     else:
         return []
 
-    return [
-    LoanApplicationResponse(
-        **document.to_dict(),
-        applicationId=document.id,
-    )
-    for document in documents
-    ]
+    applications = []
+
+    for document in documents:
+        try:
+            application = LoanApplicationResponse(
+                **document.to_dict(),
+                applicationId=document.id,
+            )
+            applications.append(application)
+        except ValidationError:
+            # Older Firestore records may not match the current schema.
+            continue
+
+    return applications
 
 
 def save_ai_decision(

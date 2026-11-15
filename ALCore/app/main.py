@@ -312,26 +312,3 @@ async def underwrite_mortgage_application(
     save_ai_decision(application_id, decision)
 
     return decision
-
-
-def save_valuation(
-    application_id: str,
-    property_data: dict,
-    assessment_data: dict,
-) -> str:
-    """Save an AI property valuation to Firestore."""
-
-    now = datetime.now(timezone.utc)
-
-    valuation_ref = db.collection("valuations").document()
-
-    valuation_record = {
-        "applicationId": application_id,
-        "valuationPrediction": assessment_data["predicted_value"],
-        "valuationData": property_data,
-        "createdAt": now,
-    }
-
-    valuation_ref.set(valuation_record)
-
-    return valuation_ref.id
