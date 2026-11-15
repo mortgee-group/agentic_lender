@@ -90,3 +90,25 @@ export async function getCoreApplications(): Promise<CoreApplication[]> {
  if (!Array.isArray(data)) throw new Error("AL-Core returned an unexpected applications format (expected an array).");
  return data as CoreApplication[];
 }
+
+/** Fields required by AL-Core LoanApplicationCreate (current main). */
+export type CoreApplicationCreate = {
+ householdAnnualGrossIncome: number;
+ existingDebtLiabilities: number;
+ deposit: number;
+ requestedMortgageTerm: number;
+ sellerAskingPrice: number;
+ property: {
+  county: string;
+  floor_area: number;
+  bedrooms: number;
+  bathrooms: number;
+  year_built: number;
+  property_type: "APARTMENT"|"DETACHED"|"SEMI_DETACHED"|"TERRACED"|"BUNGALOW"|"TOWN_HOUSE"|"COMMERCIAL"|"OTHER";
+  ber_rating: "A1"|"A2"|"A3"|"B1"|"B2"|"B3"|"C1"|"C2"|"C3"|"D1"|"D2"|"E1"|"E2"|"F"|"G"|"EXEMPT";
+ };
+};
+export const createCoreApplication = (data: CoreApplicationCreate) =>
+ coreRequest<{applicationId:string;message:string}>("/applications",{
+  method:"POST",body:JSON.stringify(data),
+ });

@@ -1,8 +1,9 @@
 import type {PortalRole} from "../types/roles";
-export type Page="portal"|"pipeline"|"files"|"file-detail"|"audit"|"stress"|"settlement"|"about";
+export type Page="new-application"|"portal"|"pipeline"|"files"|"file-detail"|"audit"|"stress"|"settlement"|"about";
 type Link={page:Page;icon:string;label:string};
 const borrowerLinks:Link[]=[
  {page:"portal",icon:"▦",label:"Dashboard"},
+ {page:"new-application",icon:"＋",label:"New Application"},
  {page:"files",icon:"⌑",label:"My Applications"}
 ];
 const brokerLinks:Link[]=[

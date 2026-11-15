@@ -162,3 +162,21 @@ as **Not assessed**. The backend's Tier 1 (lowest risk) through Tier 5
 The existing fictional pipeline and detail views are not yet wired to the
 real application IDs. The next step is `GET /applications/{applicationId}`,
 then Borrower `POST /applications`; do not open a demo file using a real ID.
+
+## Borrower mortgage application submission (development-only)
+
+The Borrower navigation now includes **New Application**. Its form matches
+`POST /applications` in current `ALCore/app/models.py`: numeric income,
+liabilities, deposit, term, asking price, county, floor area, bedroom and
+bathroom count, year built, property type, and BER rating.
+
+The user must have a verified Borrower profile in AL-Core. The API uses their
+verified Firebase UID as `borrowerId`, calculates requested loan amount and
+estimated LTV, and persists a real Firestore application. The frontend does
+not submit borrowerId or allow brokers or underwriters to create applications.
+
+**Use fictional test information only.** A successful submission shows the
+new document ID and refreshes the Live Applications panel in My Applications.
+The sample application tables remain separate and fictional. Sign in as the
+Underwriter to confirm the new application is visible through their API
+access. The Broker should not see the unassigned application (`brokerId=null`).

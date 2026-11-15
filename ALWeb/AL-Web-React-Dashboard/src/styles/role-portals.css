@@ -13,3 +13,5 @@
 .live-applications-count{padding:0 24px;font-size:12px;color:var(--muted);margin:0 0 8px}
 .live-applications-error{padding:15px 24px;color:#9f2424;background:#fff3f3;font-size:12px;overflow-wrap:anywhere}
 .live-applications-footer{padding:11px 24px 18px;margin:0!important;font-size:11px!important;color:var(--muted)}
+
+.new-core-application{max-width:860px}.new-core-application .subhead{font-size:13px}.core-form-calculated{margin:18px 0!important;font-size:13px!important}.core-form-error{margin-top:20px}.new-core-application .form-actions{flex-wrap:wrap}
