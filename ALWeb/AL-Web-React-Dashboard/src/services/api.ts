@@ -11,8 +11,21 @@ export class ApiError extends Error {
  }
 }
 async function errorDetail(response: Response): Promise<string> {
- const body = await response.json().catch(() => null) as {detail?: unknown} | null;
- return typeof body?.detail === "string" ? body.detail : response.statusText || "Request failed";
+ const body: unknown = await response.json().catch(() => null);
+ if (body && typeof body === "object" && "detail" in body) {
+  const detail = (body as { detail: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  // FastAPI uses an array for Pydantic validation errors (HTTP 422).
+  if (Array.isArray(detail)) {
+   return detail.map(item => {
+    if (!item || typeof item !== "object") return String(item);
+    const issue = item as { loc?: unknown; msg?: unknown; type?: unknown };
+    const location = Array.isArray(issue.loc) ? issue.loc.join(".") : "request";
+    return `${location}: ${String(issue.msg ?? issue.type ?? "Validation error")}`;
+   }).join("; ");
+  }
+ }
+ return response.statusText || `HTTP ${response.status}`;
 }
 export async function coreRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
  const user = getFirebaseAuth().currentUser;
