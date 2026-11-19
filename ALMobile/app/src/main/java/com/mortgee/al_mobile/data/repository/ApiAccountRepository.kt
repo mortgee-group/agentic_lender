@@ -142,39 +142,11 @@ class ApiAccountRepository @Inject constructor(
             }
             val token = tokenResult.getOrThrow()
 
-            if (!sessionOwner.isAttemptCurrent(attempt)) {
-                return SignInResult.GenericFailure
-            }
-
-            val bearerHeader = "Bearer $token"
-            val profile = try {
-                profileApiService.createProfile(
-                    bearerToken = bearerHeader,
-                    request = CreateProfileRequest(displayName = displayName),
-                )
-            } catch (e: HttpException) {
-                if (e.code() == 409) {
-                    reconcileProfileAfterAmbiguousCreate(
-                        attempt = attempt,
-                        candidateUid = candidateUser.uid,
-                        bearerHeader = bearerHeader,
-                    ) ?: return failAmbiguousProfileReconciliation(attempt)
-                } else {
-                    sessionOwner.cancelAttempt(attempt)
-                    return mapProfileCreateHttpException(e)
-                }
-            } catch (_: IOException) {
-                reconcileProfileAfterAmbiguousCreate(
-                    attempt = attempt,
-                    candidateUid = candidateUser.uid,
-                    bearerHeader = bearerHeader,
-                ) ?: return failAmbiguousProfileReconciliation(attempt)
-            }
-
-            return verifyBorrowerAndCommitSession(
+            return createAndCommitBorrowerProfile(
                 attempt = attempt,
                 candidateUid = candidateUser.uid,
-                profile = profile,
+                bearerHeader = "Bearer $token",
+                displayName = displayName,
             )
         } catch (e: CancellationException) {
             sessionOwner.cancelAttempt(attempt)
@@ -212,24 +184,36 @@ class ApiAccountRepository @Inject constructor(
             }
 
             val bearerHeader = "Bearer $token"
-            val profile = try {
+            val existingProfile = try {
                 profileApiService.getProfile(bearerHeader)
             } catch (e: HttpException) {
-                sessionOwner.cancelAttempt(attempt)
-                return when (e.code()) {
-                    400, 401, 403 -> SignInResult.RejectedAuthentication
-                    404 -> SignInResult.MissingProfile
-                    else -> SignInResult.GenericFailure
+                if (e.code() == 404) {
+                    null
+                } else {
+                    sessionOwner.cancelAttempt(attempt)
+                    return when (e.code()) {
+                        400, 401, 403 -> SignInResult.RejectedAuthentication
+                        else -> SignInResult.GenericFailure
+                    }
                 }
             } catch (_: IOException) {
                 sessionOwner.cancelAttempt(attempt)
                 return SignInResult.Connectivity
             }
 
-            verifyBorrowerAndCommitSession(
+            if (existingProfile != null) {
+                return verifyBorrowerAndCommitSession(
+                    attempt = attempt,
+                    candidateUid = candidateUser.uid,
+                    profile = existingProfile,
+                )
+            }
+
+            return createAndCommitBorrowerProfile(
                 attempt = attempt,
                 candidateUid = candidateUser.uid,
-                profile = profile,
+                bearerHeader = bearerHeader,
+                displayName = displayName,
             )
         } catch (e: CancellationException) {
             sessionOwner.cancelAttempt(attempt)
@@ -238,6 +222,47 @@ class ApiAccountRepository @Inject constructor(
             sessionOwner.cancelAttempt(attempt)
             SignInResult.GenericFailure
         }
+    }
+
+    private suspend fun createAndCommitBorrowerProfile(
+        attempt: SessionAttempt,
+        candidateUid: String,
+        bearerHeader: String,
+        displayName: String,
+    ): SignInResult {
+        if (!sessionOwner.isAttemptCurrent(attempt)) {
+            return SignInResult.GenericFailure
+        }
+
+        val profile = try {
+            profileApiService.createProfile(
+                bearerToken = bearerHeader,
+                request = CreateProfileRequest(displayName = displayName),
+            )
+        } catch (e: HttpException) {
+            if (e.code() == 409) {
+                reconcileProfileAfterAmbiguousCreate(
+                    attempt = attempt,
+                    candidateUid = candidateUid,
+                    bearerHeader = bearerHeader,
+                ) ?: return failAmbiguousProfileReconciliation(attempt)
+            } else {
+                sessionOwner.cancelAttempt(attempt)
+                return mapProfileCreateHttpException(e)
+            }
+        } catch (_: IOException) {
+            reconcileProfileAfterAmbiguousCreate(
+                attempt = attempt,
+                candidateUid = candidateUid,
+                bearerHeader = bearerHeader,
+            ) ?: return failAmbiguousProfileReconciliation(attempt)
+        }
+
+        return verifyBorrowerAndCommitSession(
+            attempt = attempt,
+            candidateUid = candidateUid,
+            profile = profile,
+        )
     }
 
     private suspend fun verifyBorrowerAndCommitSession(

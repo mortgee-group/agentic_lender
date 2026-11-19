@@ -1438,6 +1438,178 @@ class ApiAccountRepositoryTest {
         assertEquals(null, fakeAuthAdapter.currentUid)
     }
 
+    @Test
+    fun `completeRegistration on confirmed GET 404 creates missing Borrower profile with one POST and commits session`() = runTest {
+        val candidateUid = "pre-death-created-uid"
+        val candidateEmail = "partial.borrower@example.com"
+        val candidateToken = "post-restart-signin-token"
+        val displayName = "Recovered Borrower"
+
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success(candidateToken))
+        )
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Profile not found"}""".toResponseBody(null))
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            firstName = "Recovered",
+            lastName = "Borrower",
+            phoneNumber = "+1234567890",
+            createdAt = "2026-11-19T14:00:00Z",
+            updatedAt = "2026-11-19T14:00:00Z"
+        )
+
+        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, result)
+        assertEquals(1, fakeAuthAdapter.signInCount)
+        assertEquals(0, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
+        assertEquals(
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            fakeProfileApiService.lastCreatedRequest
+        )
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val currentState = sessionOwner.sessionState.value
+        assertTrue(currentState is SessionState.Authenticated)
+        val authState = currentState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(candidateEmail, authState.email)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `completeRegistration recovers account created before process death whose profile is still missing`() = runTest {
+        val candidateUid = "account-before-process-death-uid"
+        val candidateEmail = "interrupted@example.com"
+        val displayName = "Borrower After Restart"
+
+        // Step 1: Initial registration creates Firebase account, but profile POST is interrupted (or process dies before profile exists)
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success("initial-token"))
+        )
+        fakeProfileApiService.createExceptionToThrow = IOException("Process died or connection dropped before POST reached server")
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
+        )
+
+        val interruptedResult = repository.register(candidateEmail, "StrongPass123!", displayName)
+        assertEquals(SignInResult.CompletionNeeded, interruptedResult)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // Step 2: Simulate fresh process after process death (new DefaultSessionOwner with empty marker storage)
+        val postRestartSessionOwner = DefaultSessionOwner(fakeStorage, fakeAuthAdapter)
+        val postRestartRepository = ApiAccountRepository(
+            authAdapter = fakeAuthAdapter,
+            profileApiService = fakeProfileApiService,
+            sessionOwner = postRestartSessionOwner,
+            userPartitionManager = fakePartitionManager,
+            completedSessionStorage = fakeStorage
+        )
+
+        // Restore on startup fails because no completed marker was ever saved before process death
+        val restoreResult = postRestartRepository.restoreSession()
+        assertEquals(SignInResult.GenericFailure, restoreResult)
+        assertTrue(postRestartSessionOwner.sessionState.value is SessionState.SignedOut)
+
+        // Step 3: User chooses explicit completion ("Finish registration") and submits credentials + displayName.
+        // GET /users/me returns 404 (profile still missing), allowing one POST /users/me that succeeds with 201.
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success("fresh-signin-token"))
+        )
+        fakeProfileApiService.createExceptionToThrow = null
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Profile still missing"}""".toResponseBody(null))
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            createdAt = "2026-11-19T14:10:00Z",
+            updatedAt = "2026-11-19T14:10:00Z"
+        )
+
+        val createAccountCountBeforeCompletion = fakeAuthAdapter.createAccountCount
+        val getCountBeforeCompletion = fakeProfileApiService.getProfileCount
+        val postCountBeforeCompletion = fakeProfileApiService.createProfileCount
+
+        val completionResult = postRestartRepository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, completionResult)
+        assertEquals(createAccountCountBeforeCompletion, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeAuthAdapter.signInCount)
+        assertEquals(getCountBeforeCompletion + 1, fakeProfileApiService.getProfileCount)
+        assertEquals(postCountBeforeCompletion + 1, fakeProfileApiService.createProfileCount)
+        assertEquals(
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            fakeProfileApiService.lastCreatedRequest
+        )
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val finalState = postRestartSessionOwner.sessionState.value
+        assertTrue(finalState is SessionState.Authenticated)
+        val authState = finalState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `completeRegistration on confirmed GET 404 reuses registration POST validation and error handling without replay`() = runTest {
+        val candidateUid = "completion-404-post-error-uid"
+        val candidateEmail = "borrower@example.com"
+
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
+        )
+
+        // 1. POST 422 with verified display_name field -> InvalidDisplayName, 1 GET, 1 POST
+        fakeProfileApiService.createExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(
+                422,
+                """{"detail":[{"loc":["body","display_name"],"msg":"String should have at least 1 character"}]}""".toResponseBody(null)
+            )
+        )
+        val invalidNameResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "   ")
+        assertEquals(SignInResult.InvalidDisplayName, invalidNameResult)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 2. POST returns mismatched role -> UnsupportedRole, 2 GETs, 2 POSTs
+        fakeProfileApiService.createExceptionToThrow = null
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "broker",
+            displayName = "Unexpected Broker"
+        )
+        val roleMismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Unexpected Broker")
+        assertEquals(SignInResult.UnsupportedRole, roleMismatchResult)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertEquals(2, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,

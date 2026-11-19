@@ -53,11 +53,13 @@ interface AccountRepository {
      *   commits the session with zero writes.
      * - If `200 OK` returns a missing, unknown, or non-Borrower role, rejects modification and returns
      *   [SignInResult.UnsupportedRole] with zero profile writes.
-     * - Any read failure ends the attempt without creating or overwriting a profile.
+     * - If `404 Not Found` is confirmed, sends one `POST /users/me` with [displayName] and commits on a valid
+     *   Borrower profile response (reusing the registration create and commit path).
+     * - Any other read failure ends the attempt without creating or overwriting a profile.
      *
      * @param email Existing candidate user's email address.
      * @param password Existing candidate user's raw password (sent unchanged; never logged or persisted).
-     * @param displayName Display name for registration completion.
+     * @param displayName Display name to use if the profile needs to be created on `404`.
      * @return A safe [SignInResult] outcome free of credentials, tokens, or raw exceptions.
      * @throws kotlinx.coroutines.CancellationException if the calling coroutine is cancelled.
      */
