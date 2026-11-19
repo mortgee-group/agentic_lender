@@ -989,6 +989,256 @@ class ApiAccountRepositoryTest {
         assertTrue(fakeAuthAdapter.signOutCount > 0)
     }
 
+    @Test
+    fun `register reconciles POST 409 followed by matching GET 200 Borrower profile and commits session with one logical read and zero additional POSTs`() = runTest {
+        val candidateUid = "reconciled-409-uid"
+        val candidateEmail = "reconciled409@example.com"
+        val candidateToken = "reconciled-409-token"
+        val displayName = "Reconciled Borrower"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success(candidateToken))
+        )
+        fakeProfileApiService.createExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(409, """{"detail":"Profile already exists"}""".toResponseBody(null))
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            firstName = "Reconciled",
+            lastName = "Borrower",
+            phoneNumber = "+1234567890",
+            createdAt = "2026-11-19T12:00:00Z",
+            updatedAt = "2026-11-19T12:00:00Z"
+        )
+
+        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, result)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val currentState = sessionOwner.sessionState.value
+        assertTrue(currentState is SessionState.Authenticated)
+        val authState = currentState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(candidateEmail, authState.email)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `register reconciles POST timeout followed by matching GET 200 Borrower profile and commits session with one logical read and zero additional POSTs`() = runTest {
+        val candidateUid = "reconciled-timeout-uid"
+        val candidateEmail = "reconciled.timeout@example.com"
+        val candidateToken = "reconciled-timeout-token"
+        val displayName = "Timeout Reconciled Borrower"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success(candidateToken))
+        )
+        fakeProfileApiService.createExceptionToThrow = java.net.SocketTimeoutException("Read timed out during POST /users/me")
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            createdAt = "2026-11-19T12:05:00Z",
+            updatedAt = "2026-11-19T12:05:00Z"
+        )
+
+        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, result)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val currentState = sessionOwner.sessionState.value
+        assertTrue(currentState is SessionState.Authenticated)
+        val authState = currentState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `register reconciles POST 409 and timeout followed by GET 404 by closing candidate and returning CompletionNeeded with one logical read and zero additional POSTs`() = runTest {
+        // 1. POST 409 followed by GET 404
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "uid-409-then-404", email = "borrower@example.com")
+        )
+        fakeProfileApiService.createExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(409, """{"detail":"Conflict"}""".toResponseBody(null))
+        )
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
+        )
+        val signOutBefore409 = fakeAuthAdapter.signOutCount
+
+        val conflict404Result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.CompletionNeeded, conflict404Result)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertTrue(fakeAuthAdapter.signOutCount > signOutBefore409)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // 2. POST timeout followed by GET 404
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "uid-timeout-then-404", email = "borrower@example.com")
+        )
+        fakeProfileApiService.createExceptionToThrow = java.net.SocketTimeoutException("Read timed out")
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
+        )
+        val signOutBeforeTimeout = fakeAuthAdapter.signOutCount
+
+        val timeout404Result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.CompletionNeeded, timeout404Result)
+        assertEquals(2, fakeProfileApiService.createProfileCount)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertTrue(fakeAuthAdapter.signOutCount > signOutBeforeTimeout)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `register reconciliation rejects GET 200 when returned UID mismatches, role is missing, or role is non-Borrower and keeps access closed`() = runTest {
+        val candidateUid = "candidate-reconcile-uid"
+        fakeProfileApiService.createExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(409, """{"detail":"Conflict"}""".toResponseBody(null))
+        )
+
+        // 1. Mismatched UID on reconciliation GET 200
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = "other-user-uid",
+            email = "borrower@example.com",
+            role = "borrower",
+            displayName = "Test Borrower"
+        )
+
+        val mismatchResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.RejectedAuthentication, mismatchResult)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // 2. Missing role on reconciliation GET 200
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "borrower@example.com",
+            role = null,
+            displayName = "Test Borrower"
+        )
+
+        val missingRoleResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.UnsupportedRole, missingRoleResult)
+        assertEquals(2, fakeProfileApiService.createProfileCount)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // 3. Non-Borrower role on reconciliation GET 200
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "borrower@example.com",
+            role = "broker",
+            displayName = "Unexpected Broker"
+        )
+
+        val nonBorrowerResult = repository.register("borrower@example.com", "StrongPass123!", "Unexpected Broker")
+        assertEquals(SignInResult.UnsupportedRole, nonBorrowerResult)
+        assertEquals(3, fakeProfileApiService.createProfileCount)
+        assertEquals(3, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `register reconciliation aborts on stale completion during POST or GET without committing or overwriting newer partition`() = runTest {
+        val staleUid = "stale-reconcile-uid"
+        val newerUid = "newer-active-uid"
+
+        fakePartitionManager.preparePartition(newerUid)
+        fakePartitionManager.preparedUids.clear()
+
+        // 1. Attempt invalidated while reconciliation GET 200 is in flight after POST timeout
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = staleUid, email = "stale@example.com")
+        )
+        fakeProfileApiService.createExceptionToThrow = java.net.SocketTimeoutException("Read timed out")
+        fakeProfileApiService.onGetProfile = {
+            sessionOwner.invalidateSession()
+        }
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = staleUid,
+            email = "stale@example.com",
+            role = "borrower",
+            displayName = "Stale Borrower"
+        )
+
+        val staleGetResult = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+
+        assertEquals(SignInResult.GenericFailure, staleGetResult)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertEquals(newerUid, fakePartitionManager.currentPartitionUid)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // 2. Attempt invalidated during POST before 409 is thrown skips reconciliation GET completely
+        fakeProfileApiService.onGetProfile = null
+        fakeProfileApiService.createExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(409, """{"detail":"Conflict"}""".toResponseBody(null))
+        )
+        fakeProfileApiService.onCreateProfile = {
+            sessionOwner.invalidateSession()
+        }
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = staleUid, email = "stale@example.com")
+        )
+
+        val stalePostResult = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+
+        assertEquals(SignInResult.GenericFailure, stalePostResult)
+        assertEquals(2, fakeProfileApiService.createProfileCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertEquals(newerUid, fakePartitionManager.currentPartitionUid)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
@@ -1042,7 +1292,10 @@ class ApiAccountRepositoryTest {
 
     private class FakeProfileApiService : ProfileApiService {
         var profileResult: UserProfileDto? = null
+        var getProfileResult: UserProfileDto? = null
         var exceptionToThrow: Exception? = null
+        var createExceptionToThrow: Exception? = null
+        var getExceptionToThrow: Exception? = null
         var lastHeader: String? = null
         var lastCreatedRequest: com.mortgee.al_mobile.data.network.model.CreateProfileRequest? = null
         var getProfileCount: Int = 0
@@ -1054,8 +1307,8 @@ class ApiAccountRepositoryTest {
             getProfileCount++
             lastHeader = bearerToken
             onGetProfile?.invoke()
-            exceptionToThrow?.let { throw it }
-            return profileResult ?: throw IllegalStateException("Profile not configured")
+            (getExceptionToThrow ?: exceptionToThrow)?.let { throw it }
+            return (getProfileResult ?: profileResult) ?: throw IllegalStateException("Profile not configured")
         }
 
         override suspend fun createProfile(
@@ -1066,7 +1319,7 @@ class ApiAccountRepositoryTest {
             lastHeader = bearerToken
             lastCreatedRequest = request
             onCreateProfile?.invoke()
-            exceptionToThrow?.let { throw it }
+            (createExceptionToThrow ?: exceptionToThrow)?.let { throw it }
             return profileResult ?: throw IllegalStateException("Profile not configured")
         }
     }

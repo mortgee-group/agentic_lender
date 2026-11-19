@@ -6,7 +6,9 @@ import com.mortgee.al_mobile.data.model.BackendRole
 import com.mortgee.al_mobile.data.model.SignInResult
 import com.mortgee.al_mobile.data.network.ProfileApiService
 import com.mortgee.al_mobile.data.network.model.CreateProfileRequest
+import com.mortgee.al_mobile.data.network.model.UserProfileDto
 import com.mortgee.al_mobile.data.session.CompletedSessionStorage
+import com.mortgee.al_mobile.data.session.SessionAttempt
 import com.mortgee.al_mobile.data.session.SessionOwner
 import com.mortgee.al_mobile.data.session.UserPartitionManager
 import kotlinx.coroutines.CancellationException
@@ -144,17 +146,29 @@ class ApiAccountRepository @Inject constructor(
                 return SignInResult.GenericFailure
             }
 
+            val bearerHeader = "Bearer $token"
             val profile = try {
                 profileApiService.createProfile(
-                    bearerToken = "Bearer $token",
+                    bearerToken = bearerHeader,
                     request = CreateProfileRequest(displayName = displayName),
                 )
             } catch (e: HttpException) {
-                sessionOwner.cancelAttempt(attempt)
-                return mapProfileCreateHttpException(e)
+                if (e.code() == 409) {
+                    reconcileProfileAfterAmbiguousCreate(
+                        attempt = attempt,
+                        candidateUid = candidateUser.uid,
+                        bearerHeader = bearerHeader,
+                    ) ?: return failAmbiguousProfileReconciliation(attempt)
+                } else {
+                    sessionOwner.cancelAttempt(attempt)
+                    return mapProfileCreateHttpException(e)
+                }
             } catch (_: IOException) {
-                sessionOwner.cancelAttempt(attempt)
-                return SignInResult.CompletionNeeded
+                reconcileProfileAfterAmbiguousCreate(
+                    attempt = attempt,
+                    candidateUid = candidateUser.uid,
+                    bearerHeader = bearerHeader,
+                ) ?: return failAmbiguousProfileReconciliation(attempt)
             }
 
             if (!sessionOwner.isAttemptCurrent(attempt)) {
@@ -306,6 +320,36 @@ class ApiAccountRepository @Inject constructor(
             throw e
         } catch (_: Exception) {
             sessionOwner.invalidateSession()
+            SignInResult.GenericFailure
+        }
+    }
+
+    private suspend fun reconcileProfileAfterAmbiguousCreate(
+        attempt: SessionAttempt,
+        candidateUid: String,
+        bearerHeader: String,
+    ): UserProfileDto? {
+        if (!sessionOwner.isAttemptCurrent(attempt) || authAdapter.currentUid != candidateUid) {
+            return null
+        }
+
+        return try {
+            profileApiService.getProfile(bearerHeader)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: HttpException) {
+            null
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    private suspend fun failAmbiguousProfileReconciliation(attempt: SessionAttempt): SignInResult {
+        val wasCurrent = sessionOwner.isAttemptCurrent(attempt)
+        sessionOwner.cancelAttempt(attempt)
+        return if (wasCurrent) {
+            SignInResult.CompletionNeeded
+        } else {
             SignInResult.GenericFailure
         }
     }
