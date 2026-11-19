@@ -92,6 +92,26 @@ class RegisterViewModel @Inject constructor(
         _formState.update { it.clearErrors() }
     }
 
+    private var lastAppliedEntryGeneration: Int = 0
+
+    /**
+     * Applies a fresh navigation entry generation when entering [RegisterRoute] from guest navigation.
+     *
+     * Resets [formState] to an empty [RegisterFormState] configured with [initialMode] once per
+     * distinct positive [entryGeneration], while remaining a no-op across configuration changes
+     * (such as screen rotation) for the same [entryGeneration].
+     */
+    internal fun applyNavigationEntry(
+        entryGeneration: Int,
+        initialMode: RegisterMode,
+    ) {
+        if (entryGeneration <= 0 || entryGeneration == lastAppliedEntryGeneration) {
+            return
+        }
+        lastAppliedEntryGeneration = entryGeneration
+        _formState.value = RegisterFormState(mode = initialMode)
+    }
+
     /**
      * Resets the entire form to its initial empty state.
      */

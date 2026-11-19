@@ -38,8 +38,9 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 | `RegisterFormState` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterFormState.kt` | Implemented `RegisterMode` (`CreateAccount`, `CompleteExisting`) and `RegisterFormState` (04.10) exposing `displayName`, `email`, transient `password` (masked in `toString()`), field/form errors, local validation (`validate()`), and recovery mode transitions. |
 | `RegisterViewModel` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterViewModel.kt` | Implemented `@HiltViewModel class RegisterViewModel` (04.11) managing `RegisterFormState`, validating local inputs, capturing snapshots, setting `isSubmitting` synchronously before launching, choosing `register` vs `completeRegistration` by `RegisterMode`, and clearing transient password state on completion. |
 | `RegisterScreen` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterScreen.kt` | Implemented `@Composable fun RegisterScreen` (04.12) rendering controlled display name, email, and masked password inputs, safe field/form error messages, busy progress state disabling editing and duplicate submission, explicit "Finish registration" mode actions, and shared `onSubmit` callback for keyboard and button actions. |
-| `RegisterRoute` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterRoute.kt` | Implemented `@Composable fun RegisterRoute` (04.14) resolving `RegisterViewModel` via `hiltViewModel()`, collecting `formState` with `collectAsStateWithLifecycle()`, and wiring callbacks to `RegisterScreen` while preserving active submission state across configuration changes. |
-| `AppNavigation` | **Modify (M)** | `app/src/main/java/com/mortgee/al_mobile/ui/navigation/AppNavigation.kt` | Entry navigation host connecting sign-in and registration to session state. |
+| `RegisterRoute` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterRoute.kt` | Implemented `@Composable fun RegisterRoute` (04.14, 04.15) resolving `RegisterViewModel` via `hiltViewModel()`, collecting `formState` with `collectAsStateWithLifecycle()`, applying guest navigation entry generation and initial mode without resetting on rotation, and clearing the form on Back / Sign-In return. |
+| `SignInRoute` / `SignInScreen` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/ui/signin/SignInRoute.kt`, `app/src/main/java/com/mortgee/al_mobile/ui/signin/SignInScreen.kt` | Added guest navigation links (04.15) to enter Borrower registration (`onNavigateToRegister`) or explicit registration completion (`onNavigateToFinishRegistration`, including recovery link on `MissingProfile` / `CompletionNeeded`). |
+| `AppNavigation` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/ui/navigation/AppNavigation.kt` | Entry navigation host (04.15) connecting sign-in, registration (`GuestDestination.Register`), and explicit completion (`GuestDestination.CompleteRegistration`) to session state, reaching `AuthenticatedLanding` on session commit and resetting guest navigation state so Back cannot recover a submitted form. |
 | `MainActivity` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | App entry activity initializing session restore and rendering `AppNavigation`. |
 
 ---
@@ -124,5 +125,5 @@ Existing test files to be extended for Task 04 implementation:
 
 ## 6. Verification Status
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (246 tests passed, 0 failures)
+- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (251 tests passed, 0 failures)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**

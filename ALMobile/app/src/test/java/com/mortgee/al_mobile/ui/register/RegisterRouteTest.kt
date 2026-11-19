@@ -124,6 +124,54 @@ class RegisterRouteTest {
         assertEquals(1, fakeRepository.completeRegistrationCallCount)
     }
 
+    @Test
+    fun `applyNavigationEntry preserves in-flight submission across rotation for same entryGeneration and resets on new entryGeneration`() = runTest {
+        // 1. Enter RegisterRoute from SignIn with entryGeneration = 1 in CompleteExisting mode
+        viewModel.applyNavigationEntry(
+            entryGeneration = 1,
+            initialMode = RegisterMode.CompleteExisting,
+        )
+        assertEquals(RegisterMode.CompleteExisting, viewModel.formState.value.mode)
+
+        // 2. User enters fields and submits
+        viewModel.onDisplayNameChanged("Test Borrower")
+        viewModel.onEmailChanged("borrower@example.com")
+        viewModel.onPasswordChanged("Password123!")
+
+        val pendingResult = CompletableDeferred<SignInResult>()
+        fakeRepository.pendingCompleteResult = pendingResult
+
+        viewModel.submit()
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(viewModel.formState.value.isSubmitting)
+        assertEquals(1, fakeRepository.completeRegistrationCallCount)
+
+        // 3. Simulate device rotation: RegisterRoute recomposes with same entryGeneration = 1
+        viewModel.applyNavigationEntry(
+            entryGeneration = 1,
+            initialMode = RegisterMode.CompleteExisting,
+        )
+        assertTrue(viewModel.formState.value.isSubmitting)
+        assertEquals("Test Borrower", viewModel.formState.value.displayName)
+        assertEquals("borrower@example.com", viewModel.formState.value.email)
+        assertEquals(1, fakeRepository.completeRegistrationCallCount)
+
+        pendingResult.complete(SignInResult.Success)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 4. Subsequent fresh navigation entry (entryGeneration = 2) resets form so prior submitted form is not recovered
+        viewModel.applyNavigationEntry(
+            entryGeneration = 2,
+            initialMode = RegisterMode.CreateAccount,
+        )
+        val freshState = viewModel.formState.value
+        assertEquals("", freshState.displayName)
+        assertEquals("", freshState.email)
+        assertEquals("", freshState.password)
+        assertEquals(RegisterMode.CreateAccount, freshState.mode)
+        assertFalse(freshState.isSubmitting)
+    }
+
     private class SuspendingFakeAccountRepository : AccountRepository {
         var registerCallCount = 0
         var completeRegistrationCallCount = 0
