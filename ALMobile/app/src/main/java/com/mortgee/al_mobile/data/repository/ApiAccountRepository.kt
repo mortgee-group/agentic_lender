@@ -171,54 +171,121 @@ class ApiAccountRepository @Inject constructor(
                 ) ?: return failAmbiguousProfileReconciliation(attempt)
             }
 
-            if (!sessionOwner.isAttemptCurrent(attempt)) {
-                return SignInResult.GenericFailure
-            }
-
-            if (profile.uid != candidateUser.uid) {
-                sessionOwner.cancelAttempt(attempt)
-                return SignInResult.RejectedAuthentication
-            }
-
-            val role = profile.decodeRole()
-            if (role != BackendRole.BORROWER) {
-                sessionOwner.cancelAttempt(attempt)
-                return SignInResult.UnsupportedRole
-            }
-
-            if (!sessionOwner.isAttemptCurrent(attempt)) {
-                return SignInResult.GenericFailure
-            }
-
-            val partitionReady = userPartitionManager.preparePartition(candidateUser.uid)
-            if (!partitionReady) {
-                sessionOwner.cancelAttempt(attempt)
-                return SignInResult.GenericFailure
-            }
-
-            val committed = sessionOwner.commitSession(
+            return verifyBorrowerAndCommitSession(
                 attempt = attempt,
-                uid = candidateUser.uid,
-                email = profile.email,
-                role = role,
-                displayName = profile.displayName,
-                firstName = profile.firstName,
-                lastName = profile.lastName,
-                phoneNumber = profile.phoneNumber,
-                createdAt = profile.createdAt,
-                updatedAt = profile.updatedAt,
+                candidateUid = candidateUser.uid,
+                profile = profile,
             )
-
-            if (committed) {
-                SignInResult.Success
-            } else {
-                sessionOwner.cancelAttempt(attempt)
-                SignInResult.GenericFailure
-            }
         } catch (e: CancellationException) {
             sessionOwner.cancelAttempt(attempt)
             throw e
         } catch (_: Exception) {
+            sessionOwner.cancelAttempt(attempt)
+            SignInResult.GenericFailure
+        }
+    }
+
+    override suspend fun completeRegistration(
+        email: String,
+        password: String,
+        displayName: String,
+    ): SignInResult {
+        val attempt = sessionOwner.startSignInAttempt() ?: return SignInResult.Busy
+
+        return try {
+            val authResult = authAdapter.signIn(email, password)
+            if (authResult is AuthResult.Failure) {
+                sessionOwner.cancelAttempt(attempt)
+                return authResult.error
+            }
+            val candidateUser = (authResult as AuthResult.Success).user
+
+            val tokenResult = candidateUser.getIdToken()
+            if (tokenResult.isFailure) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.RejectedAuthentication
+            }
+            val token = tokenResult.getOrThrow()
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
+            val bearerHeader = "Bearer $token"
+            val profile = try {
+                profileApiService.getProfile(bearerHeader)
+            } catch (e: HttpException) {
+                sessionOwner.cancelAttempt(attempt)
+                return when (e.code()) {
+                    400, 401, 403 -> SignInResult.RejectedAuthentication
+                    404 -> SignInResult.MissingProfile
+                    else -> SignInResult.GenericFailure
+                }
+            } catch (_: IOException) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.Connectivity
+            }
+
+            verifyBorrowerAndCommitSession(
+                attempt = attempt,
+                candidateUid = candidateUser.uid,
+                profile = profile,
+            )
+        } catch (e: CancellationException) {
+            sessionOwner.cancelAttempt(attempt)
+            throw e
+        } catch (_: Exception) {
+            sessionOwner.cancelAttempt(attempt)
+            SignInResult.GenericFailure
+        }
+    }
+
+    private suspend fun verifyBorrowerAndCommitSession(
+        attempt: SessionAttempt,
+        candidateUid: String,
+        profile: UserProfileDto,
+    ): SignInResult {
+        if (!sessionOwner.isAttemptCurrent(attempt)) {
+            return SignInResult.GenericFailure
+        }
+
+        if (profile.uid != candidateUid) {
+            sessionOwner.cancelAttempt(attempt)
+            return SignInResult.RejectedAuthentication
+        }
+
+        val role = profile.decodeRole()
+        if (role != BackendRole.BORROWER) {
+            sessionOwner.cancelAttempt(attempt)
+            return SignInResult.UnsupportedRole
+        }
+
+        if (!sessionOwner.isAttemptCurrent(attempt)) {
+            return SignInResult.GenericFailure
+        }
+
+        val partitionReady = userPartitionManager.preparePartition(candidateUid)
+        if (!partitionReady) {
+            sessionOwner.cancelAttempt(attempt)
+            return SignInResult.GenericFailure
+        }
+
+        val committed = sessionOwner.commitSession(
+            attempt = attempt,
+            uid = candidateUid,
+            email = profile.email,
+            role = role,
+            displayName = profile.displayName,
+            firstName = profile.firstName,
+            lastName = profile.lastName,
+            phoneNumber = profile.phoneNumber,
+            createdAt = profile.createdAt,
+            updatedAt = profile.updatedAt,
+        )
+
+        return if (committed) {
+            SignInResult.Success
+        } else {
             sessionOwner.cancelAttempt(attempt)
             SignInResult.GenericFailure
         }

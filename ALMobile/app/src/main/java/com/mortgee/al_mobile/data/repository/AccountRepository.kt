@@ -42,4 +42,28 @@ interface AccountRepository {
         password: String,
         displayName: String,
     ): SignInResult
+
+    /**
+     * Explicitly completes a previously started Borrower registration where the Firebase account
+     * already exists (e.g., after an interrupted response, connectivity drop, or correctable profile error).
+     *
+     * Authenticates the existing account once via [com.mortgee.al_mobile.data.auth.AuthAdapter.signIn] and inspects
+     * `GET /users/me`:
+     * - If `200 OK` returns a valid matching [com.mortgee.al_mobile.data.model.BackendRole.BORROWER] profile,
+     *   commits the session with zero writes.
+     * - If `200 OK` returns a missing, unknown, or non-Borrower role, rejects modification and returns
+     *   [SignInResult.UnsupportedRole] with zero profile writes.
+     * - Any read failure ends the attempt without creating or overwriting a profile.
+     *
+     * @param email Existing candidate user's email address.
+     * @param password Existing candidate user's raw password (sent unchanged; never logged or persisted).
+     * @param displayName Display name for registration completion.
+     * @return A safe [SignInResult] outcome free of credentials, tokens, or raw exceptions.
+     * @throws kotlinx.coroutines.CancellationException if the calling coroutine is cancelled.
+     */
+    suspend fun completeRegistration(
+        email: String,
+        password: String,
+        displayName: String,
+    ): SignInResult
 }

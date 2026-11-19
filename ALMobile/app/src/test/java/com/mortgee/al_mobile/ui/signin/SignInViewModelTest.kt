@@ -192,5 +192,11 @@ class SignInViewModelTest {
             password: String,
             displayName: String,
         ): SignInResult = resultToReturn
+
+        override suspend fun completeRegistration(
+            email: String,
+            password: String,
+            displayName: String,
+        ): SignInResult = resultToReturn
     }
 }

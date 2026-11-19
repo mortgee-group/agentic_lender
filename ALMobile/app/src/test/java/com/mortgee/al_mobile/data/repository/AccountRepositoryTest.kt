@@ -32,6 +32,18 @@ class AccountRepositoryTest {
                     SignInResult.InvalidDisplayName
                 }
             }
+
+            override suspend fun completeRegistration(
+                email: String,
+                password: String,
+                displayName: String,
+            ): SignInResult {
+                return if (email.isNotBlank() && password.isNotBlank() && displayName.isNotBlank()) {
+                    SignInResult.Success
+                } else {
+                    SignInResult.InvalidCredentials
+                }
+            }
         }
 
         assertEquals(
@@ -46,6 +58,10 @@ class AccountRepositoryTest {
             SignInResult.Success,
             fakeRepository.register("borrower@example.com", "secret123", "Test Borrower")
         )
+        assertEquals(
+            SignInResult.Success,
+            fakeRepository.completeRegistration("borrower@example.com", "secret123", "Test Borrower")
+        )
     }
 
     @Test(expected = CancellationException::class)
@@ -58,6 +74,12 @@ class AccountRepositoryTest {
             override suspend fun restoreSession(): SignInResult = SignInResult.Success
 
             override suspend fun register(
+                email: String,
+                password: String,
+                displayName: String,
+            ): SignInResult = SignInResult.Success
+
+            override suspend fun completeRegistration(
                 email: String,
                 password: String,
                 displayName: String,

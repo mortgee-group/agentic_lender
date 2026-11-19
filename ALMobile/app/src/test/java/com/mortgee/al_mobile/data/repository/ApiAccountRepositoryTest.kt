@@ -1239,6 +1239,205 @@ class ApiAccountRepositoryTest {
         assertEquals(null, fakeStorage.getCompletedUid())
     }
 
+    @Test
+    fun `completeRegistration authenticates once, reads existing Borrower profile, and commits session with zero POSTs`() = runTest {
+        val candidateUid = "existing-borrower-uid"
+        val candidateEmail = "existing.borrower@example.com"
+        val candidateToken = "existing-borrower-token"
+        val displayName = "Existing Borrower"
+
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success(candidateToken))
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            firstName = "Existing",
+            lastName = "Borrower",
+            phoneNumber = "+1234567890",
+            createdAt = "2026-11-19T13:00:00Z",
+            updatedAt = "2026-11-19T13:00:00Z"
+        )
+
+        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, result)
+        assertEquals(1, fakeAuthAdapter.signInCount)
+        assertEquals(0, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val currentState = sessionOwner.sessionState.value
+        assertTrue(currentState is SessionState.Authenticated)
+        val authState = currentState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(candidateEmail, authState.email)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `completeRegistration rejects non-Borrower, missing role, or mismatched UID without creating or overwriting a profile`() = runTest {
+        val candidateUid = "existing-user-uid"
+        val candidateEmail = "user@example.com"
+
+        // 1. Existing Broker profile returns UnsupportedRole with zero POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "broker",
+            displayName = "Existing Broker"
+        )
+        val signOutBeforeBroker = fakeAuthAdapter.signOutCount
+
+        val brokerResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+
+        assertEquals(SignInResult.UnsupportedRole, brokerResult)
+        assertEquals(1, fakeAuthAdapter.signInCount)
+        assertEquals(0, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertTrue(fakeAuthAdapter.signOutCount > signOutBeforeBroker)
+        assertEquals(null, fakeStorage.getCompletedUid())
+
+        // 2. Existing Underwriter profile returns UnsupportedRole with zero POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "underwriter",
+            displayName = "Existing Underwriter"
+        )
+
+        val underwriterResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+
+        assertEquals(SignInResult.UnsupportedRole, underwriterResult)
+        assertEquals(2, fakeAuthAdapter.signInCount)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+
+        // 3. Missing role returns UnsupportedRole with zero POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = null,
+            displayName = "Missing Role User"
+        )
+
+        val missingRoleResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+
+        assertEquals(SignInResult.UnsupportedRole, missingRoleResult)
+        assertEquals(3, fakeAuthAdapter.signInCount)
+        assertEquals(3, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+
+        // 4. Mismatched UID returns RejectedAuthentication with zero POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getProfileResult = UserProfileDto(
+            uid = "mismatched-other-uid",
+            email = candidateEmail,
+            role = "borrower",
+            displayName = "Other Borrower"
+        )
+
+        val mismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+
+        assertEquals(SignInResult.RejectedAuthentication, mismatchResult)
+        assertEquals(4, fakeAuthAdapter.signInCount)
+        assertEquals(4, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+    }
+
+    @Test
+    fun `completeRegistration ends attempt on auth failure, token failure, or profile read errors with zero profile writes`() = runTest {
+        val candidateUid = "completion-read-error-uid"
+        val candidateEmail = "borrower@example.com"
+
+        // 1. Auth signIn failure -> InvalidCredentials, 0 GETs, 0 POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Failure(SignInResult.InvalidCredentials)
+        val authFailResult = repository.completeRegistration(candidateEmail, "WrongPass", "Test Borrower")
+        assertEquals(SignInResult.InvalidCredentials, authFailResult)
+        assertEquals(1, fakeAuthAdapter.signInCount)
+        assertEquals(0, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+
+        // 2. Token retrieval failure -> RejectedAuthentication, 0 GETs, 0 POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.failure(IOException("Token error")))
+        )
+        val tokenFailResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.RejectedAuthentication, tokenFailResult)
+        assertEquals(2, fakeAuthAdapter.signInCount)
+        assertEquals(0, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+
+        // 3. GET 401 -> RejectedAuthentication, 1 GET, 0 POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(401, """{"detail":"Unauthorized"}""".toResponseBody(null))
+        )
+        val http401Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.RejectedAuthentication, http401Result)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 4. GET 500 -> GenericFailure, 2 GETs, 0 POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getExceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(500, """{"detail":"Internal Server Error"}""".toResponseBody(null))
+        )
+        val http500Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.GenericFailure, http500Result)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 5. GET IOException -> Connectivity, 3 GETs, 0 POSTs
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail)
+        )
+        fakeProfileApiService.getExceptionToThrow = IOException("Connection reset")
+        val ioResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.Connectivity, ioResult)
+        assertEquals(3, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
