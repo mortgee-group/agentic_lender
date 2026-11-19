@@ -578,10 +578,21 @@ class ApiAccountRepositoryTest {
         override val currentUid: String?
             get() = sdkUid
         var signInResult: AuthResult = AuthResult.Failure(SignInResult.InvalidCredentials)
+        var createAccountResult: AuthResult = AuthResult.Failure(SignInResult.GenericFailure)
         var signOutCount: Int = 0
+        var createAccountCount: Int = 0
 
         override suspend fun signIn(email: String, password: String): AuthResult {
             val result = signInResult
+            if (result is AuthResult.Success) {
+                sdkUid = result.user.uid
+            }
+            return result
+        }
+
+        override suspend fun createAccount(email: String, password: String): AuthResult {
+            createAccountCount++
+            val result = createAccountResult
             if (result is AuthResult.Success) {
                 sdkUid = result.user.uid
             }

@@ -18,6 +18,11 @@ class SignInResultTest {
         assertFalse(SignInResult.MissingProfile.isSuccess)
         assertFalse(SignInResult.UnsupportedRole.isSuccess)
         assertFalse(SignInResult.GenericFailure.isSuccess)
+        assertFalse(SignInResult.InvalidEmail.isSuccess)
+        assertFalse(SignInResult.WeakPassword.isSuccess)
+        assertFalse(SignInResult.InvalidDisplayName.isSuccess)
+        assertFalse(SignInResult.AccountExists.isSuccess)
+        assertFalse(SignInResult.CompletionNeeded.isSuccess)
     }
 
     @Test
@@ -32,6 +37,11 @@ class SignInResultTest {
             SignInResult.MissingProfile,
             SignInResult.UnsupportedRole,
             SignInResult.GenericFailure,
+            SignInResult.InvalidEmail,
+            SignInResult.WeakPassword,
+            SignInResult.InvalidDisplayName,
+            SignInResult.AccountExists,
+            SignInResult.CompletionNeeded,
         )
 
         val mappedNames = outcomes.map { result ->
@@ -45,10 +55,15 @@ class SignInResultTest {
                 SignInResult.MissingProfile -> "MissingProfile"
                 SignInResult.UnsupportedRole -> "UnsupportedRole"
                 SignInResult.GenericFailure -> "GenericFailure"
+                SignInResult.InvalidEmail -> "InvalidEmail"
+                SignInResult.WeakPassword -> "WeakPassword"
+                SignInResult.InvalidDisplayName -> "InvalidDisplayName"
+                SignInResult.AccountExists -> "AccountExists"
+                SignInResult.CompletionNeeded -> "CompletionNeeded"
             }
         }
 
-        assertEquals(9, mappedNames.size)
+        assertEquals(14, mappedNames.size)
         assertEquals(
             listOf(
                 "Success",
@@ -60,6 +75,11 @@ class SignInResultTest {
                 "MissingProfile",
                 "UnsupportedRole",
                 "GenericFailure",
+                "InvalidEmail",
+                "WeakPassword",
+                "InvalidDisplayName",
+                "AccountExists",
+                "CompletionNeeded",
             ),
             mappedNames
         )

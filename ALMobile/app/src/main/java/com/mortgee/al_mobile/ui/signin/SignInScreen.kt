@@ -236,6 +236,11 @@ fun SignInScreen(
 private fun formatErrorMessage(result: SignInResult): String {
     return when (result) {
         SignInResult.InvalidCredentials -> "Invalid email or password. Please try again."
+        SignInResult.InvalidEmail -> "Please enter a valid email address."
+        SignInResult.WeakPassword -> "Password does not meet security requirements."
+        SignInResult.InvalidDisplayName -> "Please enter a valid display name."
+        SignInResult.AccountExists -> "An account with this email already exists."
+        SignInResult.CompletionNeeded -> "Account created, but profile setup needs completion."
         SignInResult.DisabledAccount -> "This account has been disabled. Please contact support."
         SignInResult.Connectivity -> "Network connection error. Please check your connection."
         SignInResult.RejectedAuthentication -> "Authentication failed. Please verify your credentials."

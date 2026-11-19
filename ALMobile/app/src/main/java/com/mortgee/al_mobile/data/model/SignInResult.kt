@@ -33,6 +33,38 @@ sealed interface SignInResult {
     /** Generic or unexpected failure. */
     data object GenericFailure : SignInResult
 
+    /**
+     * Email address is malformed or rejected by Firebase (`ERROR_INVALID_EMAIL`)
+     * or local validation. Targets the email input control.
+     */
+    data object InvalidEmail : SignInResult
+
+    /**
+     * Password does not meet strength requirements (`FirebaseAuthWeakPasswordException` / `ERROR_WEAK_PASSWORD`)
+     * or local validation. Targets the password input control.
+     */
+    data object WeakPassword : SignInResult
+
+    /**
+     * Display name is blank locally or rejected by AL-Core (`HTTP 422` with verified `display_name` field error).
+     * Targets the display name input control.
+     */
+    data object InvalidDisplayName : SignInResult
+
+    /**
+     * Firebase reports that an account with this email already exists
+     * (`FirebaseAuthUserCollisionException` / `ERROR_EMAIL_ALREADY_IN_USE`).
+     * Offers ordinary Sign-In and explicit "Finish registration" without silently signing in.
+     */
+    data object AccountExists : SignInResult
+
+    /**
+     * The Firebase credential account was created, but AL-Core profile establishment could not be
+     * settled. Candidate session is closed via Task 03 cleanup and the user is offered
+     * explicit "Finish registration".
+     */
+    data object CompletionNeeded : SignInResult
+
     val isSuccess: Boolean
         get() = this is Success
 }
