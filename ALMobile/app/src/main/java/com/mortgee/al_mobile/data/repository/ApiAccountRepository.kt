@@ -2,8 +2,10 @@ package com.mortgee.al_mobile.data.repository
 
 import com.mortgee.al_mobile.data.auth.AuthAdapter
 import com.mortgee.al_mobile.data.auth.AuthResult
+import com.mortgee.al_mobile.data.model.BackendRole
 import com.mortgee.al_mobile.data.model.SignInResult
 import com.mortgee.al_mobile.data.network.ProfileApiService
+import com.mortgee.al_mobile.data.network.model.CreateProfileRequest
 import com.mortgee.al_mobile.data.session.CompletedSessionStorage
 import com.mortgee.al_mobile.data.session.SessionOwner
 import com.mortgee.al_mobile.data.session.UserPartitionManager
@@ -105,6 +107,101 @@ class ApiAccountRepository @Inject constructor(
             if (committed) {
                 SignInResult.Success
             } else {
+                SignInResult.GenericFailure
+            }
+        } catch (e: CancellationException) {
+            sessionOwner.cancelAttempt(attempt)
+            throw e
+        } catch (_: Exception) {
+            sessionOwner.cancelAttempt(attempt)
+            SignInResult.GenericFailure
+        }
+    }
+
+    override suspend fun register(
+        email: String,
+        password: String,
+        displayName: String,
+    ): SignInResult {
+        val attempt = sessionOwner.startSignInAttempt() ?: return SignInResult.Busy
+
+        return try {
+            val authResult = authAdapter.createAccount(email, password)
+            if (authResult is AuthResult.Failure) {
+                sessionOwner.cancelAttempt(attempt)
+                return authResult.error
+            }
+            val candidateUser = (authResult as AuthResult.Success).user
+
+            val tokenResult = candidateUser.getIdToken()
+            if (tokenResult.isFailure) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.RejectedAuthentication
+            }
+            val token = tokenResult.getOrThrow()
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
+            val profile = try {
+                profileApiService.createProfile(
+                    bearerToken = "Bearer $token",
+                    request = CreateProfileRequest(displayName = displayName),
+                )
+            } catch (e: HttpException) {
+                sessionOwner.cancelAttempt(attempt)
+                return when (e.code()) {
+                    400, 401, 403 -> SignInResult.RejectedAuthentication
+                    else -> SignInResult.GenericFailure
+                }
+            } catch (_: IOException) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.Connectivity
+            }
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
+            if (profile.uid != candidateUser.uid) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.RejectedAuthentication
+            }
+
+            val role = profile.decodeRole()
+            if (role != BackendRole.BORROWER) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.UnsupportedRole
+            }
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
+            val partitionReady = userPartitionManager.preparePartition(candidateUser.uid)
+            if (!partitionReady) {
+                sessionOwner.cancelAttempt(attempt)
+                return SignInResult.GenericFailure
+            }
+
+            val committed = sessionOwner.commitSession(
+                attempt = attempt,
+                uid = candidateUser.uid,
+                email = profile.email,
+                role = role,
+                displayName = profile.displayName,
+                firstName = profile.firstName,
+                lastName = profile.lastName,
+                phoneNumber = profile.phoneNumber,
+                createdAt = profile.createdAt,
+                updatedAt = profile.updatedAt,
+            )
+
+            if (committed) {
+                SignInResult.Success
+            } else {
+                sessionOwner.cancelAttempt(attempt)
                 SignInResult.GenericFailure
             }
         } catch (e: CancellationException) {

@@ -31,8 +31,8 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 | `UserPartitionManager` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/UserPartitionManager.kt` | Interface: `preparePartition(uid)`, `isPartitionReady(uid)`, `clearPartition()`. |
 | `CompletedSessionStorage` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/CompletedSessionStorage.kt` | Interface: `getCompletedUid()`, `saveCompletedUid(uid)`, `clearCompletedUid()`. |
 | `PrivateTokenSeam` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/network/PrivateTokenSeam.kt` | Bearer token provider for AL-Core HTTP calls. |
-| `AccountRepository` | **Modify (M)** | `app/src/main/java/com/mortgee/al_mobile/data/repository/AccountRepository.kt` | Currently defines `signIn` and `restoreSession`. Missing `register(email, password, displayName): SignInResult` and `completeRegistration(email, password, displayName): SignInResult` (see [`task-04-03-contract.md`](./task-04-03-contract.md); declarations ship in 04.06 and 04.09A). |
-| `ApiAccountRepository` | **Modify (M)** | `app/src/main/java/com/mortgee/al_mobile/data/repository/ApiAccountRepository.kt` | Concrete implementation of `AccountRepository`. |
+| `AccountRepository` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/data/repository/AccountRepository.kt` | Defines `signIn`, `restoreSession`, and `register(email, password, displayName): SignInResult` (04.06). `completeRegistration(email, password, displayName): SignInResult` ships in 04.09A (see [`task-04-03-contract.md`](./task-04-03-contract.md)). |
+| `ApiAccountRepository` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/data/repository/ApiAccountRepository.kt` | Concrete implementation of `AccountRepository` including `register` with one Firebase create, one profile POST (`display_name`), UID + `BackendRole.BORROWER` verification, partition preparation, and session commit. |
 | `SignInResult` | **Reuse/Modify (R/M)** | `app/src/main/java/com/mortgee/al_mobile/data/model/SignInResult.kt` | Unified safe outcome carrier (`data object` variants with no credentials, tokens, or raw exceptions). Reuses existing variants (`Success`, `Busy`, `InvalidCredentials`, `DisabledAccount`, `Connectivity`, `RejectedAuthentication`, `MissingProfile`, `UnsupportedRole`, `GenericFailure`) and specifies registration extensions (`InvalidEmail`, `WeakPassword`, `InvalidDisplayName`, `AccountExists`, `CompletionNeeded`) in [`task-04-03-contract.md`](./task-04-03-contract.md). |
 | `SignInFormState` | **Reuse (R reference)** | `app/src/main/java/com/mortgee/al_mobile/ui/signin/SignInFormState.kt` | Reference pattern for in-memory masked credential state. |
 | `RegisterFormState` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterFormState.kt` | **Search evidence**: No registration form state file exists in `ui/`. |
@@ -124,5 +124,5 @@ Existing test files to be extended for Task 04 implementation:
 
 ## 6. Verification Status
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (175 tests passed, 0 failures)
+- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (198 tests passed, 0 failures)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**

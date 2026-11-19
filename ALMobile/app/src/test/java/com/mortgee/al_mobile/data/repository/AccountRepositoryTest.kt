@@ -9,7 +9,7 @@ import org.junit.Test
 class AccountRepositoryTest {
 
     @Test
-    fun `account repository contract returns expected sign in results`() = runTest {
+    fun `account repository contract returns expected sign in and register results`() = runTest {
         val fakeRepository = object : AccountRepository {
             override suspend fun signIn(email: String, password: String): SignInResult {
                 return if (email == "valid@example.com" && password == "secret") {
@@ -20,6 +20,18 @@ class AccountRepositoryTest {
             }
 
             override suspend fun restoreSession(): SignInResult = SignInResult.Success
+
+            override suspend fun register(
+                email: String,
+                password: String,
+                displayName: String,
+            ): SignInResult {
+                return if (email.isNotBlank() && password.isNotBlank() && displayName.isNotBlank()) {
+                    SignInResult.Success
+                } else {
+                    SignInResult.InvalidDisplayName
+                }
+            }
         }
 
         assertEquals(
@@ -29,6 +41,10 @@ class AccountRepositoryTest {
         assertEquals(
             SignInResult.InvalidCredentials,
             fakeRepository.signIn("invalid@example.com", "wrong")
+        )
+        assertEquals(
+            SignInResult.Success,
+            fakeRepository.register("borrower@example.com", "secret123", "Test Borrower")
         )
     }
 
@@ -40,6 +56,12 @@ class AccountRepositoryTest {
             }
 
             override suspend fun restoreSession(): SignInResult = SignInResult.Success
+
+            override suspend fun register(
+                email: String,
+                password: String,
+                displayName: String,
+            ): SignInResult = SignInResult.Success
         }
 
         fakeRepository.signIn("test@example.com", "password")

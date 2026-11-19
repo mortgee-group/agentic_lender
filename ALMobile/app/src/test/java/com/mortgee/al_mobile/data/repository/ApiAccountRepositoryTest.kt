@@ -596,6 +596,211 @@ class ApiAccountRepositoryTest {
         assertEquals(null, fakeStorage.getCompletedUid())
     }
 
+    @Test
+    fun `register executes one Firebase create and one profile POST and commits authenticated Borrower session on valid 201`() = runTest {
+        val candidateUid = "new-borrower-uid-123"
+        val candidateEmail = "new.borrower@example.com"
+        val candidateToken = "new-firebase-id-token-abc"
+        val displayName = "Test Borrower"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success(candidateToken))
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = candidateEmail,
+            role = "borrower",
+            displayName = displayName,
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+1234567890",
+            createdAt = "2026-11-19T10:00:00Z",
+            updatedAt = "2026-11-19T10:00:00Z"
+        )
+
+        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+
+        assertEquals(SignInResult.Success, result)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertEquals(0, fakeAuthAdapter.signInCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertEquals(0, fakeProfileApiService.getProfileCount)
+        assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
+        assertEquals(
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            fakeProfileApiService.lastCreatedRequest
+        )
+        assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
+        assertEquals(candidateUid, fakeStorage.getCompletedUid())
+
+        val currentState = sessionOwner.sessionState.value
+        assertTrue(currentState is SessionState.Authenticated)
+        val authState = currentState as SessionState.Authenticated
+        assertEquals(candidateUid, authState.uid)
+        assertEquals(candidateEmail, authState.email)
+        assertEquals(BackendRole.BORROWER, authState.role)
+        assertEquals(displayName, authState.displayName)
+    }
+
+    @Test
+    fun `register returns Busy without calling Firebase or profile API when session owner cannot acquire attempt`() = runTest {
+        val activeAttempt = sessionOwner.startSignInAttempt()
+        assertTrue(activeAttempt != null)
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.Busy, result)
+        assertEquals(0, fakeAuthAdapter.createAccountCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+    }
+
+    @Test
+    fun `register keeps access closed and returns RejectedAuthentication when returned profile UID mismatches candidate`() = runTest {
+        val candidateUid = "candidate-uid-111"
+        val wrongProfileUid = "wrong-profile-uid-222"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = wrongProfileUid,
+            email = "borrower@example.com",
+            role = "borrower",
+            displayName = "Test Borrower"
+        )
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.RejectedAuthentication, result)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `register keeps access closed and returns UnsupportedRole when profile role is absent`() = runTest {
+        val candidateUid = "candidate-uid-123"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "borrower@example.com",
+            role = null,
+            displayName = "Test Borrower"
+        )
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.UnsupportedRole, result)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `register keeps access closed and returns UnsupportedRole when profile role is non-Borrower`() = runTest {
+        val candidateUid = "candidate-uid-123"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "broker@example.com")
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "broker@example.com",
+            role = "broker",
+            displayName = "Unexpected Broker"
+        )
+
+        val result = repository.register("broker@example.com", "StrongPass123!", "Unexpected Broker")
+
+        assertEquals(SignInResult.UnsupportedRole, result)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `register keeps access closed and returns GenericFailure when partition preparation fails`() = runTest {
+        val candidateUid = "candidate-uid-123"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "borrower@example.com",
+            role = "borrower",
+            displayName = "Test Borrower"
+        )
+        fakePartitionManager.shouldSucceed = false
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.GenericFailure, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `register keeps access closed and returns GenericFailure when session commit fails due to marker storage failure`() = runTest {
+        val candidateUid = "candidate-uid-123"
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = candidateUid, email = "borrower@example.com")
+        )
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = candidateUid,
+            email = "borrower@example.com",
+            role = "borrower",
+            displayName = "Test Borrower"
+        )
+        fakeStorage.shouldSaveSucceed = false
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.GenericFailure, result)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `register does not prepare partition or commit when attempt is invalidated during profile POST`() = runTest {
+        val staleUid = "stale-register-uid-111"
+        val newerUid = "newer-uid-222"
+
+        fakePartitionManager.preparePartition(newerUid)
+        fakePartitionManager.preparedUids.clear()
+
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = staleUid, email = "stale@example.com")
+        )
+        fakeProfileApiService.onCreateProfile = {
+            sessionOwner.invalidateSession()
+        }
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = staleUid,
+            email = "stale@example.com",
+            role = "borrower",
+            displayName = "Stale Borrower"
+        )
+
+        val result = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+
+        assertEquals(SignInResult.GenericFailure, result)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertEquals(newerUid, fakePartitionManager.currentPartitionUid)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
@@ -612,9 +817,11 @@ class ApiAccountRepositoryTest {
         var signInResult: AuthResult = AuthResult.Failure(SignInResult.InvalidCredentials)
         var createAccountResult: AuthResult = AuthResult.Failure(SignInResult.GenericFailure)
         var signOutCount: Int = 0
+        var signInCount: Int = 0
         var createAccountCount: Int = 0
 
         override suspend fun signIn(email: String, password: String): AuthResult {
+            signInCount++
             val result = signInResult
             if (result is AuthResult.Success) {
                 sdkUid = result.user.uid
@@ -650,9 +857,13 @@ class ApiAccountRepositoryTest {
         var exceptionToThrow: Exception? = null
         var lastHeader: String? = null
         var lastCreatedRequest: com.mortgee.al_mobile.data.network.model.CreateProfileRequest? = null
+        var getProfileCount: Int = 0
+        var createProfileCount: Int = 0
         var onGetProfile: (suspend () -> Unit)? = null
+        var onCreateProfile: (suspend () -> Unit)? = null
 
         override suspend fun getProfile(bearerToken: String): UserProfileDto {
+            getProfileCount++
             lastHeader = bearerToken
             onGetProfile?.invoke()
             exceptionToThrow?.let { throw it }
@@ -663,8 +874,10 @@ class ApiAccountRepositoryTest {
             bearerToken: String,
             request: com.mortgee.al_mobile.data.network.model.CreateProfileRequest
         ): UserProfileDto {
+            createProfileCount++
             lastHeader = bearerToken
             lastCreatedRequest = request
+            onCreateProfile?.invoke()
             exceptionToThrow?.let { throw it }
             return profileResult ?: throw IllegalStateException("Profile not configured")
         }
@@ -694,10 +907,12 @@ class ApiAccountRepositoryTest {
 
     private class FakeCompletedSessionStorage : CompletedSessionStorage {
         private var savedUid: String? = null
+        var shouldSaveSucceed: Boolean = true
 
         override suspend fun getCompletedUid(): String? = savedUid
 
         override suspend fun saveCompletedUid(uid: String): Boolean {
+            if (!shouldSaveSucceed) return false
             savedUid = uid
             return true
         }

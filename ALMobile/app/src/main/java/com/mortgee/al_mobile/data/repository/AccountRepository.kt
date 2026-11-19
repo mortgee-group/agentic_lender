@@ -23,4 +23,23 @@ interface AccountRepository {
      * Propagates [kotlinx.coroutines.CancellationException] if cancelled.
      */
     suspend fun restoreSession(): SignInResult
+
+    /**
+     * Registers a new Borrower account with Firebase Authentication and creates the
+     * corresponding AL-Core Borrower profile via `POST /users/me`.
+     *
+     * Prepares the UID partition and commits the authenticated session through [com.mortgee.al_mobile.data.session.SessionOwner]
+     * upon verifying that the profile UID matches the candidate and `decodeRole() == BackendRole.BORROWER`.
+     *
+     * @param email Candidate user's email address (sent to Firebase Auth).
+     * @param password Candidate user's raw password (sent unchanged to Firebase Auth; never logged or persisted).
+     * @param displayName Candidate user's display name (sent to AL-Core in `POST /users/me`).
+     * @return A safe [SignInResult] outcome free of credentials, tokens, or raw exceptions.
+     * @throws kotlinx.coroutines.CancellationException if the calling coroutine is cancelled.
+     */
+    suspend fun register(
+        email: String,
+        password: String,
+        displayName: String,
+    ): SignInResult
 }
