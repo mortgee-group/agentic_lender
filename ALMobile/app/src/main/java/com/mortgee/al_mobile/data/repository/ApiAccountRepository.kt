@@ -151,13 +151,10 @@ class ApiAccountRepository @Inject constructor(
                 )
             } catch (e: HttpException) {
                 sessionOwner.cancelAttempt(attempt)
-                return when (e.code()) {
-                    400, 401, 403 -> SignInResult.RejectedAuthentication
-                    else -> SignInResult.GenericFailure
-                }
+                return mapProfileCreateHttpException(e)
             } catch (_: IOException) {
                 sessionOwner.cancelAttempt(attempt)
-                return SignInResult.Connectivity
+                return SignInResult.CompletionNeeded
             }
 
             if (!sessionOwner.isAttemptCurrent(attempt)) {
@@ -313,10 +310,41 @@ class ApiAccountRepository @Inject constructor(
         }
     }
 
+    private fun mapProfileCreateHttpException(e: HttpException): SignInResult {
+        return when (e.code()) {
+            400, 401, 403 -> SignInResult.RejectedAuthentication
+            409 -> SignInResult.CompletionNeeded
+            422 -> {
+                val errorBody = try {
+                    e.response()?.errorBody()?.string()
+                } catch (_: Exception) {
+                    null
+                }
+                if (isVerifiedDisplayNameError(errorBody)) {
+                    SignInResult.InvalidDisplayName
+                } else {
+                    SignInResult.GenericFailure
+                }
+            }
+            else -> SignInResult.CompletionNeeded
+        }
+    }
+
+    private fun isVerifiedDisplayNameError(errorBody: String?): Boolean {
+        if (errorBody.isNullOrBlank()) return false
+        val trimmed = errorBody.trim()
+        return trimmed.startsWith("{") && trimmed.endsWith("}") &&
+            DISPLAY_NAME_FIELD_REGEX.containsMatchIn(trimmed)
+    }
+
     private fun isNetworkException(e: Throwable?): Boolean {
         if (e == null) return false
         if (e is IOException) return true
         val msg = e.message?.lowercase() ?: ""
         return msg.contains("network") || msg.contains("connection") || msg.contains("unreachable")
+    }
+
+    companion object {
+        private val DISPLAY_NAME_FIELD_REGEX = Regex("\"(display_name|displayName)\"")
     }
 }

@@ -801,6 +801,194 @@ class ApiAccountRepositoryTest {
         assertEquals(null, fakeStorage.getCompletedUid())
     }
 
+    @Test
+    fun `register maps AuthAdapter failures with zero profile POST calls and cleans up attempt`() = runTest {
+        val adapterErrors = listOf(
+            SignInResult.InvalidEmail,
+            SignInResult.WeakPassword,
+            SignInResult.AccountExists,
+            SignInResult.Connectivity,
+            SignInResult.DisabledAccount,
+            SignInResult.GenericFailure,
+        )
+
+        for (expectedError in adapterErrors) {
+            fakeAuthAdapter.createAccountResult = AuthResult.Failure(expectedError)
+            val createCountBefore = fakeProfileApiService.createProfileCount
+
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+            assertEquals(expectedError, result)
+            assertEquals(createCountBefore, fakeProfileApiService.createProfileCount)
+            assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+            assertEquals(null, fakeStorage.getCompletedUid())
+        }
+    }
+
+    @Test
+    fun `register returns RejectedAuthentication and cleans up candidate when token lookup fails`() = runTest {
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(
+                uid = "candidate-uid-123",
+                email = "borrower@example.com",
+                tokenResult = Result.failure(IOException("Failed to fetch ID token"))
+            )
+        )
+
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+        assertEquals(SignInResult.RejectedAuthentication, result)
+        assertEquals(1, fakeAuthAdapter.createAccountCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
+    @Test
+    fun `register maps POST 400, 401, and 403 to RejectedAuthentication with zero replays and cleans up candidate`() = runTest {
+        for (statusCode in listOf(400, 401, 403)) {
+            fakeAuthAdapter.createAccountResult = AuthResult.Success(
+                TestAuthUser(uid = "candidate-uid-$statusCode", email = "borrower@example.com")
+            )
+            fakeProfileApiService.exceptionToThrow = HttpException(
+                Response.error<UserProfileDto>(statusCode, """{"detail":"Error $statusCode"}""".toResponseBody(null))
+            )
+            val postCountBefore = fakeProfileApiService.createProfileCount
+            val signOutBefore = fakeAuthAdapter.signOutCount
+
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+            assertEquals("Status $statusCode should map to RejectedAuthentication", SignInResult.RejectedAuthentication, result)
+            assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
+            assertEquals(0, fakeProfileApiService.getProfileCount)
+            assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+            assertEquals(null, fakeAuthAdapter.currentUid)
+            assertTrue(fakeAuthAdapter.signOutCount > signOutBefore)
+            assertEquals(null, fakeStorage.getCompletedUid())
+        }
+    }
+
+    @Test
+    fun `register maps POST 422 with verified display_name field identifier to InvalidDisplayName without replay`() = runTest {
+        val verifiedBodies = listOf(
+            """{"detail":[{"loc":["body","display_name"],"msg":"Field required","type":"missing"}]}""",
+            """{"errors":{"display_name":["Display name must not be blank"]}}""",
+            """{"field":"displayName","message":"Invalid display name"}""",
+        )
+
+        for (body in verifiedBodies) {
+            fakeAuthAdapter.createAccountResult = AuthResult.Success(
+                TestAuthUser(uid = "candidate-uid-422", email = "borrower@example.com")
+            )
+            fakeProfileApiService.exceptionToThrow = HttpException(
+                Response.error<UserProfileDto>(422, body.toResponseBody(null))
+            )
+            val postCountBefore = fakeProfileApiService.createProfileCount
+            val signOutBefore = fakeAuthAdapter.signOutCount
+
+            val result = repository.register("borrower@example.com", "StrongPass123!", "   ")
+
+            assertEquals("Body $body should map to InvalidDisplayName", SignInResult.InvalidDisplayName, result)
+            assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
+            assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+            assertEquals(null, fakeAuthAdapter.currentUid)
+            assertTrue(fakeAuthAdapter.signOutCount > signOutBefore)
+        }
+    }
+
+    @Test
+    fun `register maps POST 422 with unknown field or malformed error body to GenericFailure`() = runTest {
+        val unverifiedBodies = listOf(
+            """{"detail":[{"loc":["body","phone_number"],"msg":"Invalid phone"}]}""",
+            """{"detail":"Unprocessable entity"}""",
+            """not valid json at all""",
+            """""",
+        )
+
+        for (body in unverifiedBodies) {
+            fakeAuthAdapter.createAccountResult = AuthResult.Success(
+                TestAuthUser(uid = "candidate-uid-422-unverified", email = "borrower@example.com")
+            )
+            fakeProfileApiService.exceptionToThrow = HttpException(
+                Response.error<UserProfileDto>(422, body.toResponseBody(null))
+            )
+            val postCountBefore = fakeProfileApiService.createProfileCount
+            val signOutBefore = fakeAuthAdapter.signOutCount
+
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+
+            assertEquals("Body '$body' should map to GenericFailure", SignInResult.GenericFailure, result)
+            assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
+            assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+            assertEquals(null, fakeAuthAdapter.currentUid)
+            assertTrue(fakeAuthAdapter.signOutCount > signOutBefore)
+        }
+    }
+
+    @Test
+    fun `register maps POST 409, 5xx, and IOException after Firebase account creation to CompletionNeeded with zero POST replays`() = runTest {
+        // 1. HTTP 409 Conflict
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "candidate-uid-409", email = "borrower@example.com")
+        )
+        fakeProfileApiService.exceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(409, """{"detail":"Profile already exists"}""".toResponseBody(null))
+        )
+
+        val conflictResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.CompletionNeeded, conflictResult)
+        assertEquals(1, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 2. HTTP 503 Service Unavailable
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "candidate-uid-503", email = "borrower@example.com")
+        )
+        fakeProfileApiService.exceptionToThrow = HttpException(
+            Response.error<UserProfileDto>(503, """{"detail":"Service unavailable"}""".toResponseBody(null))
+        )
+
+        val serverErrorResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.CompletionNeeded, serverErrorResult)
+        assertEquals(2, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 3. IOException transport failure during POST
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "candidate-uid-io", email = "borrower@example.com")
+        )
+        fakeProfileApiService.exceptionToThrow = IOException("Connection reset during profile POST")
+
+        val ioResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        assertEquals(SignInResult.CompletionNeeded, ioResult)
+        assertEquals(3, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
+    fun `register propagates CancellationException and cleans up attempt`() = runTest {
+        fakeAuthAdapter.createAccountResult = AuthResult.Success(
+            TestAuthUser(uid = "candidate-uid-cancel", email = "borrower@example.com")
+        )
+        fakeProfileApiService.exceptionToThrow = CancellationException("Registration cancelled")
+
+        try {
+            repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+            fail("Expected CancellationException to be thrown")
+        } catch (e: CancellationException) {
+            assertEquals("Registration cancelled", e.message)
+        }
+
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+        assertTrue(fakeAuthAdapter.signOutCount > 0)
+    }
+
     // Helper fake implementations
     private class TestAuthUser(
         override val uid: String,
