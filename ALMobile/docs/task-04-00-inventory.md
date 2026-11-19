@@ -44,19 +44,19 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 
 ---
 
-## 3. Existing Hilt Bindings & Injection Mapping
+## 3. Existing Hilt Bindings & Injection Mapping (Verified in 04.13)
 
-All required Hilt modules are already defined and active in `app/src/main/java/com/mortgee/al_mobile/di/`:
+All required Hilt modules are defined, active, and verified via KSP Hilt graph compilation (`assembleDebug`) and unit tests ([`HiltModulesTest.kt`](file:///var/home/dim4s/work/agentic_lender/ALMobile/app/src/test/java/com/mortgee/al_mobile/di/HiltModulesTest.kt)) in `app/src/main/java/com/mortgee/al_mobile/di/` without requiring provider signature changes:
 
 1. **`AuthModule.kt`**:
    - `provideFirebaseAuth()` → `FirebaseAuth`
    - `provideAuthAdapter(firebaseAuth)` → `AuthAdapter` (`FirebaseAuthAdapter`)
 2. **`NetworkModule.kt`**:
    - `provideMoshi()` → `Moshi`
-   - `provideProfileApiService(retrofit)` → `ProfileApiService` (Retrofit interface)
+   - `provideProfileApiService(retrofit)` → `ProfileApiService` (Retrofit interface supporting both `getProfile` and `createProfile`)
    - `provideRetrofit(...)` → `Retrofit`
 3. **`RepositoryModule.kt`**:
-   - `@Binds bindAccountRepository(impl: ApiAccountRepository): AccountRepository`
+   - `@Binds bindAccountRepository(impl: ApiAccountRepository): AccountRepository` (resolving for both `SignInViewModel` and `RegisterViewModel`)
 4. **`SessionModule.kt`**:
    - `@Binds bindSessionOwner(impl: DefaultSessionOwner): SessionOwner`
    - `@Binds bindUserPartitionManager(impl: DefaultUserPartitionManager): UserPartitionManager`
@@ -124,5 +124,5 @@ Existing test files to be extended for Task 04 implementation:
 
 ## 6. Verification Status
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (243 tests passed, 0 failures)
+- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (244 tests passed, 0 failures)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**
