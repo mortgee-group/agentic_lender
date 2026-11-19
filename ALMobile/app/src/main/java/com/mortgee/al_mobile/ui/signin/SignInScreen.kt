@@ -264,7 +264,7 @@ fun SignInScreen(
                             onClick = onNavigateToRegister,
                             enabled = !formState.isSubmitting
                         ) {
-                            Text("Create a Borrower account")
+                            Text(NO_ACCOUNT_REGISTER_LABEL)
                         }
                     }
 
@@ -281,6 +281,8 @@ fun SignInScreen(
         }
     }
 }
+
+internal const val NO_ACCOUNT_REGISTER_LABEL = "No Account? Register"
 
 internal fun formatErrorMessage(result: SignInResult): String {
     return when (result) {
@@ -312,7 +314,8 @@ fun SignInScreenPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }
@@ -329,7 +332,8 @@ fun SignInScreenSubmittingPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }
@@ -346,7 +350,8 @@ fun SignInScreenErrorPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }

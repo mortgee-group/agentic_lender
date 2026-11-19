@@ -70,27 +70,42 @@ data class GuestNavState(
 ) {
     /**
      * Enters standard Borrower registration ([RegisterMode.CreateAccount]) with a fresh form generation.
+     * Idempotent if already at [GuestDestination.Register] so rapid duplicate clicks open registration once.
      */
-    fun enterRegister(): GuestNavState = copy(
-        destination = GuestDestination.Register,
-        registerEntryGeneration = registerEntryGeneration + 1,
-    )
+    fun enterRegister(): GuestNavState = if (destination == GuestDestination.Register) {
+        this
+    } else {
+        copy(
+            destination = GuestDestination.Register,
+            registerEntryGeneration = registerEntryGeneration + 1,
+        )
+    }
 
     /**
      * Enters explicit Borrower registration completion ([RegisterMode.CompleteExisting]) with a fresh form generation.
+     * Idempotent if already at [GuestDestination.CompleteRegistration] so rapid duplicate clicks open completion once.
      */
-    fun enterCompleteRegistration(): GuestNavState = copy(
-        destination = GuestDestination.CompleteRegistration,
-        registerEntryGeneration = registerEntryGeneration + 1,
-    )
+    fun enterCompleteRegistration(): GuestNavState = if (destination == GuestDestination.CompleteRegistration) {
+        this
+    } else {
+        copy(
+            destination = GuestDestination.CompleteRegistration,
+            registerEntryGeneration = registerEntryGeneration + 1,
+        )
+    }
 
     /**
      * Returns from registration to [GuestDestination.SignIn] and invalidates the registration form generation.
+     * Idempotent if already at [GuestDestination.SignIn].
      */
-    fun returnToSignIn(): GuestNavState = copy(
-        destination = GuestDestination.SignIn,
-        registerEntryGeneration = registerEntryGeneration + 1,
-    )
+    fun returnToSignIn(): GuestNavState = if (destination == GuestDestination.SignIn) {
+        this
+    } else {
+        copy(
+            destination = GuestDestination.SignIn,
+            registerEntryGeneration = registerEntryGeneration + 1,
+        )
+    }
 
     /**
      * Resets guest navigation upon session establishment so Back cannot recover the submitted registration form.

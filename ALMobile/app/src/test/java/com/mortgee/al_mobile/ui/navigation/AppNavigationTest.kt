@@ -173,6 +173,68 @@ class AppNavigationTest {
     }
 
     @Test
+    fun `SignIn No Account Register link tapped twice quickly opens registration once, sends zero registration requests, and single Back returns to SignIn`() {
+        assertEquals(
+            "Sign-In registration link must be labelled 'No Account? Register'",
+            "No Account? Register",
+            com.mortgee.al_mobile.ui.signin.NO_ACCOUNT_REGISTER_LABEL,
+        )
+
+        val fakeRepo = FakeAccountRepository()
+        val signInViewModel = com.mortgee.al_mobile.ui.signin.SignInViewModel(fakeRepo)
+        val registerViewModel = RegisterViewModel(fakeRepo)
+
+        var guestNav = GuestNavState()
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+
+        var registerOpenTransitions = 0
+        val onNavigateToRegister = {
+            val previousDestination = guestNav.destination
+            guestNav = guestNav.enterRegister()
+            if (previousDestination != GuestDestination.Register &&
+                guestNav.destination == GuestDestination.Register
+            ) {
+                registerOpenTransitions++
+            }
+        }
+
+        // Simulate tapping "No Account? Register" twice quickly from Sign-In
+        if (!signInViewModel.formState.value.isSubmitting) {
+            signInViewModel.clearError()
+            onNavigateToRegister()
+        }
+        if (!signInViewModel.formState.value.isSubmitting) {
+            signInViewModel.clearError()
+            onNavigateToRegister()
+        }
+
+        // Registration opens once in CreateAccount mode
+        assertEquals(1, registerOpenTransitions)
+        assertEquals(GuestDestination.Register, guestNav.destination)
+        assertEquals(RegisterMode.CreateAccount, guestNav.destination.initialRegisterMode)
+        assertEquals(1, guestNav.registerEntryGeneration)
+
+        registerViewModel.applyNavigationEntry(
+            entryGeneration = guestNav.registerEntryGeneration,
+            initialMode = guestNav.destination.initialRegisterMode!!,
+        )
+
+        // Opening the form sends zero registration or sign-in requests
+        assertEquals(0, fakeRepo.registerCallCount)
+        assertEquals(0, fakeRepo.completeRegistrationCallCount)
+        assertEquals(0, fakeRepo.signInCallCount)
+
+        // Press Back once and verify Sign-In appears immediately
+        registerViewModel.resetForm()
+        guestNav = guestNav.returnToSignIn()
+
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+        assertNull(guestNav.destination.initialRegisterMode)
+        assertEquals(0, fakeRepo.registerCallCount)
+        assertEquals(0, fakeRepo.completeRegistrationCallCount)
+    }
+
+    @Test
     fun `SignIn error messages for MissingProfile and CompletionNeeded reference Finish registration`() {
         val missingProfileMsg = formatErrorMessage(SignInResult.MissingProfile)
         assertTrue(missingProfileMsg.contains("Finish registration"))
@@ -245,10 +307,14 @@ class AppNavigationTest {
     }
 
     private class FakeAccountRepository : AccountRepository {
+        var signInCallCount = 0
         var registerCallCount = 0
         var completeRegistrationCallCount = 0
 
-        override suspend fun signIn(email: String, password: String): SignInResult = SignInResult.Success
+        override suspend fun signIn(email: String, password: String): SignInResult {
+            signInCallCount++
+            return SignInResult.Success
+        }
         override suspend fun restoreSession(): SignInResult = SignInResult.Success
 
         override suspend fun register(
