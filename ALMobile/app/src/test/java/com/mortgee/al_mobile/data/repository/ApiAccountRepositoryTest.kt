@@ -431,6 +431,38 @@ class ApiAccountRepositoryTest {
     }
 
     @Test
+    fun `stale invalidated attempt does not prepare partition or overwrite newer partition`() = runTest {
+        val staleUid = "stale-uid-111"
+        val newerUid = "newer-uid-222"
+
+        // Pre-populate active partition for a newer user during in-flight work
+        fakePartitionManager.preparePartition(newerUid)
+        fakePartitionManager.preparedUids.clear()
+
+        fakeAuthAdapter.signInResult = AuthResult.Success(
+            TestAuthUser(uid = staleUid, email = "stale@example.com")
+        )
+        fakeProfileApiService.onGetProfile = {
+            // Simulate attempt being invalidated while profile GET is in flight
+            sessionOwner.invalidateSession()
+        }
+        fakeProfileApiService.profileResult = UserProfileDto(
+            uid = staleUid,
+            email = "stale@example.com",
+            role = "borrower",
+            displayName = "Stale Borrower"
+        )
+
+        val result = repository.signIn("stale@example.com", "password")
+
+        assertEquals(SignInResult.GenericFailure, result)
+        assertTrue(fakePartitionManager.preparedUids.isEmpty())
+        assertEquals(newerUid, fakePartitionManager.currentPartitionUid)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeStorage.getCompletedUid())
+    }
+
+    @Test
     fun `restoreSession returns GenericFailure when no stored marker exists`() = runTest {
         val result = repository.restoreSession()
 
@@ -618,9 +650,11 @@ class ApiAccountRepositoryTest {
         var exceptionToThrow: Exception? = null
         var lastHeader: String? = null
         var lastCreatedRequest: com.mortgee.al_mobile.data.network.model.CreateProfileRequest? = null
+        var onGetProfile: (suspend () -> Unit)? = null
 
         override suspend fun getProfile(bearerToken: String): UserProfileDto {
             lastHeader = bearerToken
+            onGetProfile?.invoke()
             exceptionToThrow?.let { throw it }
             return profileResult ?: throw IllegalStateException("Profile not configured")
         }

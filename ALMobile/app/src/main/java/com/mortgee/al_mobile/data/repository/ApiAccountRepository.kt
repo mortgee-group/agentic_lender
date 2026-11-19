@@ -46,6 +46,10 @@ class ApiAccountRepository @Inject constructor(
             }
             val token = tokenResult.getOrThrow()
 
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
             val profile = try {
                 profileApiService.getProfile("Bearer $token")
             } catch (e: HttpException) {
@@ -60,6 +64,10 @@ class ApiAccountRepository @Inject constructor(
                 return SignInResult.Connectivity
             }
 
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
             if (profile.uid != candidateUser.uid) {
                 sessionOwner.cancelAttempt(attempt)
                 return SignInResult.RejectedAuthentication
@@ -69,6 +77,10 @@ class ApiAccountRepository @Inject constructor(
             if (role == null) {
                 sessionOwner.cancelAttempt(attempt)
                 return SignInResult.UnsupportedRole
+            }
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
             }
 
             val partitionReady = userPartitionManager.preparePartition(candidateUser.uid)
@@ -133,6 +145,10 @@ class ApiAccountRepository @Inject constructor(
             }
             val token = tokenResult.getOrThrow()
 
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
             val profile = try {
                 profileApiService.getProfile("Bearer $token")
             } catch (e: HttpException) {
@@ -147,6 +163,10 @@ class ApiAccountRepository @Inject constructor(
                 return SignInResult.Connectivity
             }
 
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
+            }
+
             if (profile.uid != completedUid) {
                 sessionOwner.invalidateSession()
                 return SignInResult.RejectedAuthentication
@@ -156,6 +176,10 @@ class ApiAccountRepository @Inject constructor(
             if (role == null) {
                 sessionOwner.invalidateSession()
                 return SignInResult.UnsupportedRole
+            }
+
+            if (!sessionOwner.isAttemptCurrent(attempt)) {
+                return SignInResult.GenericFailure
             }
 
             val partitionReady = userPartitionManager.preparePartition(completedUid)

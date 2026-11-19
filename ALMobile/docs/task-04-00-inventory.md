@@ -23,8 +23,8 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 | `AuthResult` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/auth/AuthResult.kt` | `sealed interface AuthResult` (`Success(user)`, `Failure(error)`). |
 | `AuthUser` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/auth/AuthUser.kt` | Candidate identity interface: `val uid`, `val email`, `getIdToken()`. |
 | `FirebaseAuthUser` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/auth/FirebaseAuthAdapter.kt` | `FirebaseAuthUser(private val firebaseUser: FirebaseUser) : AuthUser` |
-| `SessionOwner` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/SessionOwner.kt` | Authority interface for session state flow, attempts, and atomic commits. |
-| `DefaultSessionOwner` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/DefaultSessionOwner.kt` | Concrete implementation using `gateMutex` and `activeAttempt` verification. |
+| `SessionOwner` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/data/session/SessionOwner.kt` | Authority interface for session state flow, attempts, atomic commits, and pending-attempt check `isAttemptCurrent(attempt)`. |
+| `DefaultSessionOwner` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/data/session/DefaultSessionOwner.kt` | Concrete implementation using `gateMutex` and `activeAttempt` verification (`isAttemptCurrent`). |
 | `SessionAttempt` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/SessionAttempt.kt` | `data class SessionAttempt(val attemptId: String, val type: Type)` |
 | `SessionState` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/SessionState.kt` | `SignedOut`, `Establishing`, `Restoring`, `Authenticated`. |
 | `SessionKey` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/data/session/SessionKey.kt` | `data class SessionKey(val uid: String, val generation: Long)` |
