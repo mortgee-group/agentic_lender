@@ -37,7 +37,7 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 | `SignInFormState` | **Reuse (R reference)** | `app/src/main/java/com/mortgee/al_mobile/ui/signin/SignInFormState.kt` | Reference pattern for in-memory masked credential state. |
 | `RegisterFormState` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterFormState.kt` | Implemented `RegisterMode` (`CreateAccount`, `CompleteExisting`) and `RegisterFormState` (04.10) exposing `displayName`, `email`, transient `password` (masked in `toString()`), field/form errors, local validation (`validate()`), and recovery mode transitions. |
 | `RegisterViewModel` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterViewModel.kt` | Implemented `@HiltViewModel class RegisterViewModel` (04.11) managing `RegisterFormState`, validating local inputs, capturing snapshots, setting `isSubmitting` synchronously before launching, choosing `register` vs `completeRegistration` by `RegisterMode`, and clearing transient password state on completion. |
-| `RegisterScreen` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterScreen.kt` | **Search evidence**: No registration screen exists in `ui/`. |
+| `RegisterScreen` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterScreen.kt` | Implemented `@Composable fun RegisterScreen` (04.12) rendering controlled display name, email, and masked password inputs, safe field/form error messages, busy progress state disabling editing and duplicate submission, explicit "Finish registration" mode actions, and shared `onSubmit` callback for keyboard and button actions. |
 | `RegisterRoute` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterRoute.kt` | **Search evidence**: No registration route exists in `ui/`. |
 | `AppNavigation` | **Modify (M)** | `app/src/main/java/com/mortgee/al_mobile/ui/navigation/AppNavigation.kt` | Entry navigation host connecting sign-in and registration to session state. |
 | `MainActivity` | **Reuse (R)** | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | App entry activity initializing session restore and rendering `AppNavigation`. |
@@ -124,5 +124,5 @@ Existing test files to be extended for Task 04 implementation:
 
 ## 6. Verification Status
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (240 tests passed, 0 failures)
+- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (243 tests passed, 0 failures)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**
