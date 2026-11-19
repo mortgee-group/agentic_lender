@@ -606,9 +606,20 @@ class ApiAccountRepositoryTest {
         var profileResult: UserProfileDto? = null
         var exceptionToThrow: Exception? = null
         var lastHeader: String? = null
+        var lastCreatedRequest: com.mortgee.al_mobile.data.network.model.CreateProfileRequest? = null
 
         override suspend fun getProfile(bearerToken: String): UserProfileDto {
             lastHeader = bearerToken
+            exceptionToThrow?.let { throw it }
+            return profileResult ?: throw IllegalStateException("Profile not configured")
+        }
+
+        override suspend fun createProfile(
+            bearerToken: String,
+            request: com.mortgee.al_mobile.data.network.model.CreateProfileRequest
+        ): UserProfileDto {
+            lastHeader = bearerToken
+            lastCreatedRequest = request
             exceptionToThrow?.let { throw it }
             return profileResult ?: throw IllegalStateException("Profile not configured")
         }

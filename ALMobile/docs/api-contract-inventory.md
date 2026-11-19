@@ -54,6 +54,41 @@ This document catalogs the public HTTP API contracts, endpoints, query parameter
 - **Path Parameter**: `id`: `String`
 - **Response Schema (`CatalogueItemDto`)**: Single property listing object matching the schema above.
 
+### 3.3 Create User Profile
+- **Method & Path**: `POST /users/me`
+- **Authentication**: Bearer Token (`Authorization: Bearer <firebase_id_token>`)
+- **Status Code**: `201 Created`
+- **Request Schema (`CreateProfileRequest` / `UserProfileCreate`)**:
+  ```json
+  {
+    "role": "string?",
+    "first_name": "string?",
+    "last_name": "string?",
+    "phone_number": "string?",
+    "display_name": "string?"
+  }
+  ```
+- **Response Schema (`UserProfileDto`)**:
+  ```json
+  {
+    "uid": "string",
+    "email": "string",
+    "role": "string?",
+    "display_name": "string?",
+    "first_name": "string?",
+    "last_name": "string?",
+    "phone_number": "string?",
+    "createdAt": "string?",
+    "updatedAt": "string?"
+  }
+  ```
+
+### 3.4 Get User Profile
+- **Method & Path**: `GET /users/me`
+- **Authentication**: Bearer Token (`Authorization: Bearer <firebase_id_token>`)
+- **Status Code**: `200 OK`
+- **Response Schema (`UserProfileDto`)**: Same as above.
+
 ## 4. Error Mapping Rules
 - **HTTP 404**: Mapped to `CatalogueError.NotFound`
 - **HTTP 400 / 422**: Mapped to `CatalogueError.InvalidQuery`
