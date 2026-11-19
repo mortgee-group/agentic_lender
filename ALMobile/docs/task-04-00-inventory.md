@@ -35,7 +35,7 @@ This document records the exact declaration/file paths, Hilt bindings, test fake
 | `ApiAccountRepository` | **Modified (M)** | `app/src/main/java/com/mortgee/al_mobile/data/repository/ApiAccountRepository.kt` | Concrete implementation of `AccountRepository` including `register` and `completeRegistration` (04.09A/04.09B: authenticates once via `AuthAdapter.signIn`, reads `GET /users/me`, commits valid existing `BackendRole.BORROWER` profile with zero POSTs, allows one `POST /users/me` on confirmed `GET 404` reusing the registration create and commit path, and prevents other read errors or non-Borrower profiles from creating or overwriting a profile). |
 | `SignInResult` | **Reuse/Modify (R/M)** | `app/src/main/java/com/mortgee/al_mobile/data/model/SignInResult.kt` | Unified safe outcome carrier (`data object` variants with no credentials, tokens, or raw exceptions). Reuses existing variants (`Success`, `Busy`, `InvalidCredentials`, `DisabledAccount`, `Connectivity`, `RejectedAuthentication`, `MissingProfile`, `UnsupportedRole`, `GenericFailure`) and specifies registration extensions (`InvalidEmail`, `WeakPassword`, `InvalidDisplayName`, `AccountExists`, `CompletionNeeded`) in [`task-04-03-contract.md`](./task-04-03-contract.md). |
 | `SignInFormState` | **Reuse (R reference)** | `app/src/main/java/com/mortgee/al_mobile/ui/signin/SignInFormState.kt` | Reference pattern for in-memory masked credential state. |
-| `RegisterFormState` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterFormState.kt` | **Search evidence**: No registration form state file exists in `ui/`. |
+| `RegisterFormState` | **Created (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterFormState.kt` | Implemented `RegisterMode` (`CreateAccount`, `CompleteExisting`) and `RegisterFormState` (04.10) exposing `displayName`, `email`, transient `password` (masked in `toString()`), field/form errors, local validation (`validate()`), and recovery mode transitions. |
 | `RegisterViewModel` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterViewModel.kt` | **Search evidence**: No registration ViewModel exists in `ui/`. |
 | `RegisterScreen` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterScreen.kt` | **Search evidence**: No registration screen exists in `ui/`. |
 | `RegisterRoute` | **Create (C)** | `app/src/main/java/com/mortgee/al_mobile/ui/register/RegisterRoute.kt` | **Search evidence**: No registration route exists in `ui/`. |
@@ -124,5 +124,5 @@ Existing test files to be extended for Task 04 implementation:
 
 ## 6. Verification Status
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (216 tests passed, 0 failures)
+- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (229 tests passed, 0 failures)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**
