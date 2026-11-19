@@ -58,4 +58,12 @@ class RegisterScreenTest {
         val completionNeededMessage = formatRegisterErrorMessage(SignInResult.CompletionNeeded)
         assertTrue(completionNeededMessage.contains("Finish registration"))
     }
+
+    @Test
+    fun `Already have an account Sign in label matches 04_15B specification`() {
+        assertEquals(
+            "Already have an account? Sign in",
+            ALREADY_HAVE_ACCOUNT_SIGN_IN_LABEL,
+        )
+    }
 }

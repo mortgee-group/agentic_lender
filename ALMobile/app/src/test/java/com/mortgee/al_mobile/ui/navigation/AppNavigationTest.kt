@@ -235,6 +235,125 @@ class AppNavigationTest {
     }
 
     @Test
+    fun `Register Already have an account Sign in link returns to SignIn without submitting across two round trips and Back from SignIn cannot reopen discarded form`() {
+        assertEquals(
+            "Registration sign-in link must be labelled 'Already have an account? Sign in'",
+            "Already have an account? Sign in",
+            com.mortgee.al_mobile.ui.register.ALREADY_HAVE_ACCOUNT_SIGN_IN_LABEL,
+        )
+
+        val fakeRepo = FakeAccountRepository()
+        val signInViewModel = com.mortgee.al_mobile.ui.signin.SignInViewModel(fakeRepo)
+        val registerViewModel = RegisterViewModel(fakeRepo)
+
+        var guestNav = GuestNavState()
+
+        val navigateToRegisterFromSignIn = {
+            if (!signInViewModel.formState.value.isSubmitting) {
+                signInViewModel.clearError()
+                guestNav = guestNav.enterRegister()
+                registerViewModel.applyNavigationEntry(
+                    entryGeneration = guestNav.registerEntryGeneration,
+                    initialMode = guestNav.destination.initialRegisterMode!!,
+                )
+            }
+        }
+
+        val navigateToSignInFromRegister = {
+            if (!registerViewModel.formState.value.isSubmitting) {
+                registerViewModel.resetForm()
+                guestNav = guestNav.returnToSignIn()
+            }
+        }
+
+        // Round trip 1: SignIn -> Register -> fill idle form -> tap "Already have an account? Sign in"
+        navigateToRegisterFromSignIn()
+        assertEquals(GuestDestination.Register, guestNav.destination)
+        assertEquals(1, guestNav.registerEntryGeneration)
+
+        registerViewModel.onDisplayNameChanged("First Draft Borrower")
+        registerViewModel.onEmailChanged("draft1@example.com")
+        registerViewModel.onPasswordChanged("DraftPass1!")
+
+        navigateToSignInFromRegister()
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+        assertNull(guestNav.destination.initialRegisterMode)
+        assertEquals(0, fakeRepo.registerCallCount)
+        assertEquals(0, fakeRepo.completeRegistrationCallCount)
+        assertEquals(0, fakeRepo.signInCallCount)
+        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.email)
+        assertEquals("", registerViewModel.formState.value.password)
+
+        // Round trip 2: SignIn -> Register -> fill idle form -> tap "Already have an account? Sign in"
+        navigateToRegisterFromSignIn()
+        assertEquals(GuestDestination.Register, guestNav.destination)
+        assertTrue(guestNav.registerEntryGeneration > 1)
+        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.email)
+        assertEquals("", registerViewModel.formState.value.password)
+
+        registerViewModel.onDisplayNameChanged("Second Draft Borrower")
+        registerViewModel.onEmailChanged("draft2@example.com")
+        registerViewModel.onPasswordChanged("DraftPass2!")
+
+        navigateToSignInFromRegister()
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+        assertNull(guestNav.destination.initialRegisterMode)
+        assertEquals(0, fakeRepo.registerCallCount)
+        assertEquals(0, fakeRepo.completeRegistrationCallCount)
+        assertEquals(0, fakeRepo.signInCallCount)
+
+        // Back from SignIn must never reopen a discarded registration form (returnToSignIn is idempotent at SignIn
+        // and RegisterRoute's BackHandler is removed from composition while on SignInRoute)
+        val generationAtSignIn = guestNav.registerEntryGeneration
+        guestNav = guestNav.returnToSignIn()
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+        assertEquals(generationAtSignIn, guestNav.registerEntryGeneration)
+        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.email)
+        assertEquals("", registerViewModel.formState.value.password)
+    }
+
+    @Test
+    fun `direct guest entry into registration replaces registration with SignIn when tapping Already have an account Sign in`() {
+        val fakeRepo = FakeAccountRepository()
+        val registerViewModel = RegisterViewModel(fakeRepo)
+
+        // Direct entry where Registration is the initial guest entry point
+        var guestNav = GuestNavState(
+            destination = GuestDestination.Register,
+            registerEntryGeneration = 1,
+        )
+        registerViewModel.applyNavigationEntry(
+            entryGeneration = guestNav.registerEntryGeneration,
+            initialMode = guestNav.destination.initialRegisterMode!!,
+        )
+        assertEquals(GuestDestination.Register, guestNav.destination)
+        assertEquals(RegisterMode.CreateAccount, registerViewModel.formState.value.mode)
+
+        registerViewModel.onDisplayNameChanged("Direct Entry Borrower")
+        registerViewModel.onEmailChanged("direct@example.com")
+        registerViewModel.onPasswordChanged("DirectPass123!")
+
+        // Tap "Already have an account? Sign in" from idle registration form
+        if (!registerViewModel.formState.value.isSubmitting) {
+            registerViewModel.resetForm()
+            guestNav = guestNav.returnToSignIn()
+        }
+
+        // Replaces registration with existing SignIn destination without submitting
+        assertEquals(GuestDestination.SignIn, guestNav.destination)
+        assertNull(guestNav.destination.initialRegisterMode)
+        assertEquals(2, guestNav.registerEntryGeneration)
+        assertEquals(0, fakeRepo.registerCallCount)
+        assertEquals(0, fakeRepo.completeRegistrationCallCount)
+        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.email)
+        assertEquals("", registerViewModel.formState.value.password)
+    }
+
+    @Test
     fun `SignIn error messages for MissingProfile and CompletionNeeded reference Finish registration`() {
         val missingProfileMsg = formatErrorMessage(SignInResult.MissingProfile)
         assertTrue(missingProfileMsg.contains("Finish registration"))

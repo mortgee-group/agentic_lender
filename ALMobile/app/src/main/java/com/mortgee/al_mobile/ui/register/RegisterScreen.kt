@@ -381,7 +381,7 @@ fun RegisterScreen(
                             onClick = onNavigateToSignIn,
                             enabled = !formState.isSubmitting,
                         ) {
-                            Text("Already have a completed account? Sign In")
+                            Text(ALREADY_HAVE_ACCOUNT_SIGN_IN_LABEL)
                         }
                     }
                 }
@@ -389,6 +389,8 @@ fun RegisterScreen(
         }
     }
 }
+
+internal const val ALREADY_HAVE_ACCOUNT_SIGN_IN_LABEL = "Already have an account? Sign in"
 
 /**
  * Resolves the [VisualTransformation] for the password input field.

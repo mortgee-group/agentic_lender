@@ -135,14 +135,19 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
     sessionOwner: SessionOwner? = null,
     sessionStateOverride: SessionState? = null,
+    initialGuestDestination: GuestDestination = GuestDestination.SignIn,
     isTestFeatureEnabled: Boolean = NavigationConfig.ENABLE_TEST_FEATURE,
     onSignOut: (() -> Unit)? = null,
 ) {
     val collectedState = sessionOwner?.sessionState?.collectAsStateWithLifecycle()?.value
     val currentSessionState = sessionStateOverride ?: collectedState ?: SessionState.SignedOut
 
-    var guestDestination by rememberSaveable { mutableStateOf(GuestDestination.SignIn) }
-    var registerEntryGeneration by rememberSaveable { mutableIntStateOf(0) }
+    var guestDestination by rememberSaveable(initialGuestDestination) {
+        mutableStateOf(initialGuestDestination)
+    }
+    var registerEntryGeneration by rememberSaveable(initialGuestDestination) {
+        mutableIntStateOf(if (initialGuestDestination == GuestDestination.SignIn) 0 else 1)
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val handleSignOut: () -> Unit = {
