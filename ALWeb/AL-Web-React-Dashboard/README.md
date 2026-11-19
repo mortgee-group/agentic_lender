@@ -257,3 +257,7 @@ The API currently provides these results directly after executing the
 POST operations. Persistent historical decision retrieval will require an
 authorised read endpoint in AL-Core; reloading the page does not restore
 the full detailed decision trail.
+
+## Registration and persistent user profiles
+
+New test registrations collect first name, last name, phone number, email, password and development role. After Firebase signup, AL-Web sends the Firebase ID token and profile fields (`first_name`, `last_name`, `phone_number`, `role`) to `POST /users/me`. Successful signup requires a confirmed AL-Core profile. Sign-in and restored sessions prefer the role from `GET /users/me`; legacy accounts without a profile may use the existing local recovery role and create a missing profile on the AL-Core connection status page. If profile creation fails after signup, sign in with the same account rather than creating another one. Do not use real customer information. Privileged role selection remains temporary and must be restricted by AL-Core before production.
