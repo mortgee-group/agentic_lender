@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from pydantic import ValidationError
-
+from collections import Counter
+from fastapi import HTTPException
+from google.cloud.firestore_v1 import FieldFilter
 from app.firebase import db
 from app.models import (
     LoanApplication,
@@ -26,9 +28,12 @@ def create_application(
         requested_loan_amount / application_data.sellerAskingPrice
     ) * 100
 
+    broker_id = select_least_busy_broker()
+
     application = LoanApplication(
         **application_data.model_dump(),
         borrowerId=borrower_id,
+        brokerId=broker_id,
         requestedLoanAmount=requested_loan_amount,
         estimatedLTV=round(estimated_ltv, 2),
         createdAt=now,
@@ -157,3 +162,30 @@ def save_valuation(
     valuation_ref.set(valuation_record)
 
     return valuation_ref.id
+
+
+def select_least_busy_broker() -> str:
+    """Return the UID of the broker with the fewest assigned applications."""
+
+    brokers = list(
+        db.collection("users")
+        .where(filter=FieldFilter("role", "==", "broker"))
+        .stream()
+    )
+
+    if not brokers:
+        raise HTTPException(status_code=503, detail="No brokers are currently available")
+
+    counts = Counter()
+
+    for application in db.collection("applications").stream():
+        broker_id = application.to_dict().get("brokerId")
+        if broker_id:
+            counts[broker_id] += 1
+
+    return min(
+        (broker.id for broker in brokers),
+        key=lambda uid: (counts[uid], uid),
+    )
+
+
