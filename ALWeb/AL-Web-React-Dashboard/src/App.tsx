@@ -5,6 +5,7 @@ import Sidebar,{type Page} from "./components/Sidebar";
 import Header from "./components/Header";
 import BackendStatus from "./components/BackendStatus";
 import LiveApplications from "./components/LiveApplications";
+import LoanPipeline from "./pages/LoanPipeline";
 import LiveApplicationDetail from "./pages/LiveApplicationDetail";
 import NewMortgageApplication from "./pages/NewMortgageApplication";
 import BorrowerApplicationDetail from "./pages/BorrowerApplicationDetail";
@@ -44,7 +45,8 @@ export default function App(){
  return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout} isDemo={["audit","file-detail","stress","settlement"].includes(page)}/><div className="content">
  {page==="system-status"&&<><h1 className="page-title">AL-Core connection status</h1><p className="subtitle">Firebase authentication, backend profile and verified role access.</p><BackendStatus key={user.uid} user={user}/></>}
  {submissionMessage&&(page==="portal"||page==="files")&&<div className="notice" role="status">{submissionMessage}</div>}
- {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} dashboard={page==="portal"}/>}
+ {(page==="portal"||page==="files")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} dashboard={page==="portal"}/>}
+ {page==="pipeline"&&user.role!=="borrower"&&<LoanPipeline key={user.uid} user={user} onOpenFile={openLive}/> }
  {page==="live-detail"&&selectedLiveId&&<LiveApplicationDetail key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} role={user.role} onBack={()=>navigate(liveReturnPage)}/>}
  {page==="new-application"&&user.role==="borrower"&&<NewMortgageApplication onSaved={onSubmitted} onCancel={()=>navigate("files")}/>}
  {page==="file-detail"&&(user.role==="borrower"?<BorrowerApplicationDetail application={selectedFile} onBack={()=>navigate("files")}/>:<LoanFileDetail application={selectedFile} role={user.role} onBack={()=>navigate("pipeline")} onOpenAudit={()=>selectedFile&&openAudit(selectedFile.id)}/>)}

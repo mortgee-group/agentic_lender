@@ -257,3 +257,9 @@ The API currently provides these results directly after executing the
 POST operations. Persistent historical decision retrieval will require an
 authorised read endpoint in AL-Core; reloading the page does not restore
 the full detailed decision trail.
+
+## Live loan origination pipeline
+
+Open Assigned Pipeline (Broker) or Loan Pipeline (Underwriter). The pipeline uses authenticated GET /applications, not the Sprint 1 sample dataset. Stage counts and portfolio totals describe all accessible records. Search application IDs, borrower/broker UIDs, county or property type; filter by lifecycle, risk tier, approval likelihood and LTV; sort by date, requested amount or LTV. Missing risk/likelihood values remain unassessed and missing numeric values sort last. Clicking a stage filters the table. View details opens the existing authorised live application detail page. Refresh fetches current records. This is a read-only frontend feature; approval and settlement transitions still require backend implementation. No new dependencies or AL-Core changes are required.
+
+Manual verification: sign in as broker and underwriter; check portfolio counts against GET /applications; test combined filters, reset, all five stage buttons, null values, sorting and empty results; open a record and return to the pipeline; verify Borrower dashboard and My Applications remain unchanged. Test HTTP errors and an account with no assigned applications.
