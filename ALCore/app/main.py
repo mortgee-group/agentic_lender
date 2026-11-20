@@ -13,6 +13,7 @@ from app.applications import (
     list_applications_for_user,
     save_ai_decision,
     save_valuation,
+    save_underwriter_decision,
 )
 from app.models import (
     UserProfile,
@@ -20,6 +21,8 @@ from app.models import (
     UserRole,
     LoanApplicationCreate,
     LoanApplicationResponse,
+    UnderwriterDecisionRequest,
+    ApplicationStatus,
 )
 
 app = FastAPI(
@@ -35,7 +38,7 @@ app.add_middleware(
         "http://127.0.0.1:5173"
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -273,6 +276,11 @@ async def underwrite_mortgage_application(
             status_code=404,
             detail="Application not found",
         )
+    if application.lifecycleStatus != ApplicationStatus.APPLIED:
+        raise HTTPException(
+            status_code=409,
+            detail="AI underwriting has already been completed or is no longer allowed",
+        )
 
     underwriting_data = application.model_dump(
         mode="json",
@@ -312,3 +320,18 @@ async def underwrite_mortgage_application(
     save_ai_decision(application_id, decision)
 
     return decision
+
+
+@app.patch("/applications/{application_id}/decision")
+def decide_mortgage_application(
+    application_id: str,
+    data: UnderwriterDecisionRequest,
+    profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER)),
+):
+    """Record the final decision of an authorised Underwriter."""
+
+    return save_underwriter_decision(
+        application_id=application_id,
+        underwriter_id=profile.uid,
+        decision=data.decision,
+    )
