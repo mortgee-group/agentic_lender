@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 from pydantic import ValidationError
-
+from fastapi import HTTPException
+from google.cloud import firestore
 from app.firebase import db
 from app.models import (
     LoanApplication,
     LoanApplicationCreate,
     LoanApplicationResponse,
+    UnderwriterDecision,
 )
 
 
@@ -157,3 +159,61 @@ def save_valuation(
     valuation_ref.set(valuation_record)
 
     return valuation_ref.id
+
+
+def save_underwriter_decision(
+    application_id: str,
+    underwriter_id: str,
+    decision: UnderwriterDecision,
+) -> dict:
+    """Save a final Underwriter decision atomically."""
+
+    application_ref = db.collection("applications").document(application_id)
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def update_decision(transaction):
+        snapshot = application_ref.get(transaction=transaction)
+
+        if not snapshot.exists:
+            raise HTTPException(
+                status_code=404,
+                detail="Application not found",
+            )
+
+        application = snapshot.to_dict()
+
+        if application.get("lifecycleStatus") != "AI_DELIBERATED":
+            raise HTTPException(
+                status_code=409,
+                detail="Only AI-deliberated applications can receive an Underwriter decision",
+            )
+
+        now = datetime.now(timezone.utc)
+
+        new_status = (
+            "UNDERWRITER_APPROVED"
+            if decision == UnderwriterDecision.APPROVED
+            else "CLOSED"
+        )
+
+        updates = {
+            "underwriterDecision": decision.value,
+            "decidedBy": underwriter_id,
+            "decidedAt": now,
+            "lifecycleStatus": new_status,
+            "updatedAt": now,
+        }
+
+        transaction.update(application_ref, updates)
+
+        return {
+            "applicationId": application_id,
+            "underwriterDecision": decision.value,
+            "lifecycleStatus": new_status,
+            "decidedBy": underwriter_id,
+            "decidedAt": now,
+        }
+
+    return update_decision(transaction)
+
