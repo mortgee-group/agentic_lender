@@ -46,6 +46,24 @@ sealed interface SignInResult {
     data object WeakPassword : SignInResult
 
     /**
+     * First name is blank, exceeds length limits (1–30), or is rejected by AL-Core
+     * (`HTTP 422` with verified `body.first_name` field error). Targets the first name input control.
+     */
+    data object InvalidFirstName : SignInResult
+
+    /**
+     * Last name is blank, exceeds length limits (1–50), or is rejected by AL-Core
+     * (`HTTP 422` with verified `body.last_name` field error). Targets the last name input control.
+     */
+    data object InvalidLastName : SignInResult
+
+    /**
+     * Optional phone number exceeds length limits (max 20) or is rejected by AL-Core
+     * (`HTTP 422` with verified `body.phone_number` field error). Targets the phone number input control.
+     */
+    data object InvalidPhoneNumber : SignInResult
+
+    /**
      * Display name is blank locally or rejected by AL-Core (`HTTP 422` with verified `display_name` field error).
      * Targets the display name input control.
      */

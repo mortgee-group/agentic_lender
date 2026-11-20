@@ -106,7 +106,8 @@ class AppNavigationTest {
         )
 
         // 2. Guest fills and submits registration form
-        registerViewModel.onDisplayNameChanged("Test Borrower")
+        registerViewModel.onFirstNameChanged("Test")
+        registerViewModel.onLastNameChanged("Borrower")
         registerViewModel.onEmailChanged("borrower@example.com")
         registerViewModel.onPasswordChanged("Password123!")
         registerViewModel.submit()
@@ -139,7 +140,9 @@ class AppNavigationTest {
         )
 
         val postResetState = registerViewModel.formState.value
-        assertEquals("", postResetState.displayName)
+        assertEquals("", postResetState.firstName)
+        assertEquals("", postResetState.lastName)
+        assertEquals("", postResetState.phoneNumber)
         assertEquals("", postResetState.email)
         assertEquals("", postResetState.password)
         assertEquals(RegisterMode.CreateAccount, postResetState.mode)
@@ -158,7 +161,8 @@ class AppNavigationTest {
             initialMode = guestNav.destination.initialRegisterMode!!,
         )
 
-        registerViewModel.onDisplayNameChanged("Partial Borrower")
+        registerViewModel.onFirstNameChanged("Partial")
+        registerViewModel.onLastNameChanged("Borrower")
         registerViewModel.onEmailChanged("partial@example.com")
         registerViewModel.onPasswordChanged("Secret123!")
 
@@ -167,7 +171,8 @@ class AppNavigationTest {
         guestNav = guestNav.returnToSignIn()
 
         assertEquals(GuestDestination.SignIn, guestNav.destination)
-        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.firstName)
+        assertEquals("", registerViewModel.formState.value.lastName)
         assertEquals("", registerViewModel.formState.value.email)
         assertEquals("", registerViewModel.formState.value.password)
     }
@@ -271,7 +276,8 @@ class AppNavigationTest {
         assertEquals(GuestDestination.Register, guestNav.destination)
         assertEquals(1, guestNav.registerEntryGeneration)
 
-        registerViewModel.onDisplayNameChanged("First Draft Borrower")
+        registerViewModel.onFirstNameChanged("FirstDraft")
+        registerViewModel.onLastNameChanged("Borrower")
         registerViewModel.onEmailChanged("draft1@example.com")
         registerViewModel.onPasswordChanged("DraftPass1!")
 
@@ -281,7 +287,8 @@ class AppNavigationTest {
         assertEquals(0, fakeRepo.registerCallCount)
         assertEquals(0, fakeRepo.completeRegistrationCallCount)
         assertEquals(0, fakeRepo.signInCallCount)
-        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.firstName)
+        assertEquals("", registerViewModel.formState.value.lastName)
         assertEquals("", registerViewModel.formState.value.email)
         assertEquals("", registerViewModel.formState.value.password)
 
@@ -289,11 +296,13 @@ class AppNavigationTest {
         navigateToRegisterFromSignIn()
         assertEquals(GuestDestination.Register, guestNav.destination)
         assertTrue(guestNav.registerEntryGeneration > 1)
-        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.firstName)
+        assertEquals("", registerViewModel.formState.value.lastName)
         assertEquals("", registerViewModel.formState.value.email)
         assertEquals("", registerViewModel.formState.value.password)
 
-        registerViewModel.onDisplayNameChanged("Second Draft Borrower")
+        registerViewModel.onFirstNameChanged("SecondDraft")
+        registerViewModel.onLastNameChanged("Borrower")
         registerViewModel.onEmailChanged("draft2@example.com")
         registerViewModel.onPasswordChanged("DraftPass2!")
 
@@ -310,7 +319,8 @@ class AppNavigationTest {
         guestNav = guestNav.returnToSignIn()
         assertEquals(GuestDestination.SignIn, guestNav.destination)
         assertEquals(generationAtSignIn, guestNav.registerEntryGeneration)
-        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.firstName)
+        assertEquals("", registerViewModel.formState.value.lastName)
         assertEquals("", registerViewModel.formState.value.email)
         assertEquals("", registerViewModel.formState.value.password)
     }
@@ -332,7 +342,8 @@ class AppNavigationTest {
         assertEquals(GuestDestination.Register, guestNav.destination)
         assertEquals(RegisterMode.CreateAccount, registerViewModel.formState.value.mode)
 
-        registerViewModel.onDisplayNameChanged("Direct Entry Borrower")
+        registerViewModel.onFirstNameChanged("DirectEntry")
+        registerViewModel.onLastNameChanged("Borrower")
         registerViewModel.onEmailChanged("direct@example.com")
         registerViewModel.onPasswordChanged("DirectPass123!")
 
@@ -348,7 +359,8 @@ class AppNavigationTest {
         assertEquals(2, guestNav.registerEntryGeneration)
         assertEquals(0, fakeRepo.registerCallCount)
         assertEquals(0, fakeRepo.completeRegistrationCallCount)
-        assertEquals("", registerViewModel.formState.value.displayName)
+        assertEquals("", registerViewModel.formState.value.firstName)
+        assertEquals("", registerViewModel.formState.value.lastName)
         assertEquals("", registerViewModel.formState.value.email)
         assertEquals("", registerViewModel.formState.value.password)
     }
@@ -439,7 +451,9 @@ class AppNavigationTest {
         override suspend fun register(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             registerCallCount++
             return SignInResult.Success
@@ -448,7 +462,9 @@ class AppNavigationTest {
         override suspend fun completeRegistration(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             completeRegistrationCallCount++
             return SignInResult.Success

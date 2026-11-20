@@ -39,7 +39,9 @@ class RegisterViewModelTest {
     fun `no submit occurs on initialization`() {
         assertEquals(0, fakeAccountRepository.totalCalls)
         val state = viewModel.formState.value
-        assertEquals("", state.displayName)
+        assertEquals("", state.firstName)
+        assertEquals("", state.lastName)
+        assertEquals("", state.phoneNumber)
         assertEquals("", state.email)
         assertEquals("", state.password)
         assertEquals(RegisterMode.CreateAccount, state.mode)
@@ -48,13 +50,17 @@ class RegisterViewModelTest {
     }
 
     @Test
-    fun `updating displayName, email, password, and mode updates form state`() {
-        viewModel.updateDisplayName("Test Borrower")
+    fun `updating firstName, lastName, phoneNumber, email, password, and mode updates form state`() {
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
+        viewModel.updatePhoneNumber("+353871234567")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("SecretPass123!")
 
         val state = viewModel.formState.value
-        assertEquals("Test Borrower", state.displayName)
+        assertEquals("Test", state.firstName)
+        assertEquals("Borrower", state.lastName)
+        assertEquals("+353871234567", state.phoneNumber)
         assertEquals("borrower@example.com", state.email)
         assertEquals("SecretPass123!", state.password)
         assertEquals(RegisterMode.CreateAccount, state.mode)
@@ -68,36 +74,51 @@ class RegisterViewModelTest {
     }
 
     @Test
-    fun `convenience aliases onDisplayNameChanged, onEmailChanged, and onPasswordChanged update form state`() {
-        viewModel.onDisplayNameChanged("Jane Borrower")
+    fun `convenience aliases onFirstNameChanged, onLastNameChanged, onPhoneNumberChanged, onEmailChanged, and onPasswordChanged update form state`() {
+        viewModel.onFirstNameChanged("Jane")
+        viewModel.onLastNameChanged("Borrower")
+        viewModel.onPhoneNumberChanged("+353870000000")
         viewModel.onEmailChanged("jane@example.com")
         viewModel.onPasswordChanged("MyPass456!")
 
         val state = viewModel.formState.value
-        assertEquals("Jane Borrower", state.displayName)
+        assertEquals("Jane", state.firstName)
+        assertEquals("Borrower", state.lastName)
+        assertEquals("+353870000000", state.phoneNumber)
         assertEquals("jane@example.com", state.email)
         assertEquals("MyPass456!", state.password)
     }
 
     @Test
     fun `submit with invalid or blank required fields marks field errors, preserves password, and makes zero repository calls`() {
-        viewModel.updateDisplayName("   ")
+        viewModel.updateFirstName("   ")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("  RawPass123!  ")
         viewModel.submit()
 
         assertEquals(0, fakeAccountRepository.totalCalls)
-        assertEquals(SignInResult.InvalidDisplayName, viewModel.formState.value.displayNameError)
+        assertEquals(SignInResult.InvalidFirstName, viewModel.formState.value.firstNameError)
+        assertNull(viewModel.formState.value.lastNameError)
         assertNull(viewModel.formState.value.emailError)
         assertNull(viewModel.formState.value.passwordError)
         assertEquals("  RawPass123!  ", viewModel.formState.value.password)
 
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("")
+        viewModel.submit()
+
+        assertEquals(0, fakeAccountRepository.totalCalls)
+        assertNull(viewModel.formState.value.firstNameError)
+        assertEquals(SignInResult.InvalidLastName, viewModel.formState.value.lastNameError)
+        assertEquals("  RawPass123!  ", viewModel.formState.value.password)
+
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("")
         viewModel.submit()
 
         assertEquals(0, fakeAccountRepository.totalCalls)
-        assertNull(viewModel.formState.value.displayNameError)
+        assertNull(viewModel.formState.value.lastNameError)
         assertEquals(SignInResult.InvalidEmail, viewModel.formState.value.emailError)
         assertEquals("  RawPass123!  ", viewModel.formState.value.password)
 
@@ -112,7 +133,9 @@ class RegisterViewModelTest {
 
     @Test
     fun `submit in CreateAccount mode captures fields, sets busy before launching, calls register, and clears password at completion`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
+        viewModel.updatePhoneNumber("+353871234567")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("RawP@ssw0rd#2026")
         fakeAccountRepository.registerResult = SignInResult.Success
@@ -124,7 +147,9 @@ class RegisterViewModelTest {
         assertNull(viewModel.formState.value.error)
 
         // Mutate state while coroutine is suspended to verify captured snapshot is used
-        viewModel.updateDisplayName("Changed While In-Flight")
+        viewModel.updateFirstName("ChangedFirst")
+        viewModel.updateLastName("ChangedLast")
+        viewModel.updatePhoneNumber("+1000000")
         viewModel.updateEmail("changed@example.com")
         viewModel.updatePassword("ChangedPassword")
 
@@ -133,7 +158,9 @@ class RegisterViewModelTest {
         assertEquals(1, fakeAccountRepository.registerCallCount)
         assertEquals(0, fakeAccountRepository.completeRegistrationCallCount)
         assertEquals(0, fakeAccountRepository.signInCallCount)
-        assertEquals("Test Borrower", fakeAccountRepository.lastSubmittedDisplayName)
+        assertEquals("Test", fakeAccountRepository.lastSubmittedFirstName)
+        assertEquals("Borrower", fakeAccountRepository.lastSubmittedLastName)
+        assertEquals("+353871234567", fakeAccountRepository.lastSubmittedPhoneNumber)
         assertEquals("borrower@example.com", fakeAccountRepository.lastSubmittedEmail)
         assertEquals("RawP@ssw0rd#2026", fakeAccountRepository.lastSubmittedPassword)
 
@@ -146,7 +173,8 @@ class RegisterViewModelTest {
 
     @Test
     fun `submit in CompleteExisting mode calls completeRegistration and does not call register`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("ExactPass!2026")
         viewModel.selectCompletionMode()
@@ -161,12 +189,15 @@ class RegisterViewModelTest {
         assertEquals(0, fakeAccountRepository.registerCallCount)
         assertEquals(1, fakeAccountRepository.completeRegistrationCallCount)
         assertEquals(0, fakeAccountRepository.signInCallCount)
-        assertEquals("Test Borrower", fakeAccountRepository.lastSubmittedDisplayName)
+        assertEquals("Test", fakeAccountRepository.lastSubmittedFirstName)
+        assertEquals("Borrower", fakeAccountRepository.lastSubmittedLastName)
+        assertNull(fakeAccountRepository.lastSubmittedPhoneNumber)
         assertEquals("borrower@example.com", fakeAccountRepository.lastSubmittedEmail)
         assertEquals("ExactPass!2026", fakeAccountRepository.lastSubmittedPassword)
 
         val finalState = viewModel.formState.value
-        assertEquals("Test Borrower", finalState.displayName)
+        assertEquals("Test", finalState.firstName)
+        assertEquals("Borrower", finalState.lastName)
         assertEquals("borrower@example.com", finalState.email)
         assertEquals("", finalState.password)
         assertEquals(RegisterMode.CompleteExisting, finalState.mode)
@@ -176,7 +207,8 @@ class RegisterViewModelTest {
 
     @Test
     fun `two immediate submits trigger only one repository call`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("password123")
         fakeAccountRepository.registerResult = SignInResult.Success
@@ -193,8 +225,9 @@ class RegisterViewModelTest {
     }
 
     @Test
-    fun `failed submit preserves displayName and email, clears password, and allows retry`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+    fun `failed submit preserves profile fields and email, clears password, and allows retry`() = runTest {
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("weak")
         fakeAccountRepository.registerResult = SignInResult.WeakPassword
@@ -204,7 +237,8 @@ class RegisterViewModelTest {
 
         assertEquals(1, fakeAccountRepository.registerCallCount)
         val failedState = viewModel.formState.value
-        assertEquals("Test Borrower", failedState.displayName)
+        assertEquals("Test", failedState.firstName)
+        assertEquals("Borrower", failedState.lastName)
         assertEquals("borrower@example.com", failedState.email)
         assertEquals("", failedState.password)
         assertFalse(failedState.isSubmitting)
@@ -224,7 +258,8 @@ class RegisterViewModelTest {
         assertEquals(0, fakeAccountRepository.completeRegistrationCallCount)
         assertEquals("StrongerPassword123!", fakeAccountRepository.lastSubmittedPassword)
         val successState = viewModel.formState.value
-        assertEquals("Test Borrower", successState.displayName)
+        assertEquals("Test", successState.firstName)
+        assertEquals("Borrower", successState.lastName)
         assertEquals("borrower@example.com", successState.email)
         assertEquals("", successState.password)
         assertFalse(successState.isSubmitting)
@@ -232,11 +267,12 @@ class RegisterViewModelTest {
     }
 
     @Test
-    fun `failed register with InvalidDisplayName retains field error and routes retry through completeRegistration`() = runTest {
-        viewModel.updateDisplayName("Rejected Name")
+    fun `failed register with InvalidFirstName retains field error and routes retry through completeRegistration`() = runTest {
+        viewModel.updateFirstName("Rejected")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("ValidPassword123!")
-        fakeAccountRepository.registerResult = SignInResult.InvalidDisplayName
+        fakeAccountRepository.registerResult = SignInResult.InvalidFirstName
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -245,12 +281,12 @@ class RegisterViewModelTest {
         assertEquals(0, fakeAccountRepository.completeRegistrationCallCount)
 
         val failedState = viewModel.formState.value
-        assertEquals(SignInResult.InvalidDisplayName, failedState.displayNameError)
+        assertEquals(SignInResult.InvalidFirstName, failedState.firstNameError)
         assertEquals(RegisterMode.CompleteExisting, failedState.mode)
         assertEquals("", failedState.password)
 
-        // Fix display name, re-enter password, and retry -> routes to completeRegistration
-        viewModel.updateDisplayName("Corrected Borrower Name")
+        // Fix first name, re-enter password, and retry -> routes to completeRegistration
+        viewModel.updateFirstName("Corrected")
         viewModel.updatePassword("ValidPassword123!")
         fakeAccountRepository.completeRegistrationResult = SignInResult.Success
 
@@ -259,14 +295,15 @@ class RegisterViewModelTest {
 
         assertEquals(1, fakeAccountRepository.registerCallCount)
         assertEquals(1, fakeAccountRepository.completeRegistrationCallCount)
-        assertEquals("Corrected Borrower Name", fakeAccountRepository.lastSubmittedDisplayName)
+        assertEquals("Corrected", fakeAccountRepository.lastSubmittedFirstName)
         assertNull(viewModel.formState.value.error)
         assertEquals("", viewModel.formState.value.password)
     }
 
     @Test
     fun `failed register with CompletionNeeded offers explicit completion and routes next submit to completeRegistration`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("borrower@example.com")
         viewModel.updatePassword("ValidPassword123!")
         fakeAccountRepository.registerResult = SignInResult.CompletionNeeded
@@ -296,7 +333,8 @@ class RegisterViewModelTest {
 
     @Test
     fun `clearError and resetForm modify form state as expected`() = runTest {
-        viewModel.updateDisplayName("Test Borrower")
+        viewModel.updateFirstName("Test")
+        viewModel.updateLastName("Borrower")
         viewModel.updateEmail("test@example.com")
         viewModel.updatePassword("pass1234")
         fakeAccountRepository.registerResult = SignInResult.Connectivity
@@ -321,7 +359,9 @@ class RegisterViewModelTest {
 
         var lastSubmittedEmail: String? = null
         var lastSubmittedPassword: String? = null
-        var lastSubmittedDisplayName: String? = null
+        var lastSubmittedFirstName: String? = null
+        var lastSubmittedLastName: String? = null
+        var lastSubmittedPhoneNumber: String? = null
 
         var signInResult: SignInResult = SignInResult.Success
         var registerResult: SignInResult = SignInResult.Success
@@ -339,24 +379,32 @@ class RegisterViewModelTest {
         override suspend fun register(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             registerCallCount++
             lastSubmittedEmail = email
             lastSubmittedPassword = password
-            lastSubmittedDisplayName = displayName
+            lastSubmittedFirstName = firstName
+            lastSubmittedLastName = lastName
+            lastSubmittedPhoneNumber = phoneNumber
             return registerResult
         }
 
         override suspend fun completeRegistration(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             completeRegistrationCallCount++
             lastSubmittedEmail = email
             lastSubmittedPassword = password
-            lastSubmittedDisplayName = displayName
+            lastSubmittedFirstName = firstName
+            lastSubmittedLastName = lastName
+            lastSubmittedPhoneNumber = phoneNumber
             return completeRegistrationResult
         }
     }

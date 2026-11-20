@@ -197,28 +197,37 @@ class ProfileApiServiceTest {
     }
 
     @Test
-    fun `createProfile sends one POST to users me with candidate token and exact display_name JSON and parses 201 as UserProfileDto`() = runTest {
+    fun `createProfile sends one POST to users me with candidate token and exact UserProfileCreate JSON and parses 201 as UserProfileDto`() = runTest {
         val jsonResponse = """
             {
                 "uid": "firebase_uid_123",
                 "email": "borrower@example.com",
                 "role": "borrower",
                 "display_name": "Test Borrower",
-                "createdAt": "2026-11-06T10:00:00Z",
-                "updatedAt": "2026-11-06T10:00:00Z"
+                "first_name": "Test",
+                "last_name": "Borrower",
+                "phone_number": null,
+                "createdAt": "2026-11-13T12:00:00Z",
+                "updatedAt": "2026-11-13T12:00:00Z"
             }
         """.trimIndent()
 
         mockWebServer.enqueue(MockResponse().setResponseCode(201).setBody(jsonResponse))
 
         val token = "Bearer candidate-id-token-xyz"
-        val requestDto = CreateProfileRequest(displayName = "Test Borrower")
+        val requestDto = CreateProfileRequest.forBorrower(
+            firstName = "Test",
+            lastName = "Borrower",
+        )
         val profile = profileApiService.createProfile(token, requestDto)
 
         assertEquals("firebase_uid_123", profile.uid)
         assertEquals("borrower@example.com", profile.email)
         assertEquals("borrower", profile.role)
         assertEquals("Test Borrower", profile.displayName)
+        assertEquals("Test", profile.firstName)
+        assertEquals("Borrower", profile.lastName)
+        assertNull(profile.phoneNumber)
         assertEquals(BackendRole.BORROWER, profile.decodeRole())
         assertEquals(1, mockWebServer.requestCount)
 
@@ -227,7 +236,7 @@ class ProfileApiServiceTest {
         assertEquals("/users/me", request.path)
         assertEquals(token, request.getHeader("Authorization"))
         assertEquals(1, request.headers.values("Authorization").size)
-        assertEquals("""{"display_name":"Test Borrower"}""", request.body.readUtf8())
+        assertEquals("""{"first_name":"Test","last_name":"Borrower","role":"borrower"}""", request.body.readUtf8())
     }
 
     @Test
@@ -244,7 +253,7 @@ class ProfileApiServiceTest {
             try {
                 profileApiService.createProfile(
                     "Bearer candidate-token-$expectedCode",
-                    CreateProfileRequest(displayName = "Test Borrower")
+                    CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
                 )
                 fail("Expected HttpException for status code $expectedCode")
             } catch (e: HttpException) {
@@ -271,7 +280,7 @@ class ProfileApiServiceTest {
         try {
             profileApiService.createProfile(
                 "Bearer rejected-token",
-                CreateProfileRequest(displayName = "Test Borrower")
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
             )
             fail("Expected HttpException 401 for rejected token")
         } catch (e: HttpException) {
@@ -301,7 +310,7 @@ class ProfileApiServiceTest {
         try {
             profileApiService.createProfile(
                 "Bearer candidate-token",
-                CreateProfileRequest(displayName = "Test Borrower")
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
             )
             fail("Expected IOException on interrupted connection")
         } catch (_: IOException) {
@@ -325,7 +334,7 @@ class ProfileApiServiceTest {
         try {
             profileApiService.createProfile(
                 "Bearer candidate-secret-token",
-                CreateProfileRequest(displayName = "Test Borrower")
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
             )
             fail("Expected 401 when token is stripped for untrusted origin")
         } catch (e: HttpException) {
@@ -354,7 +363,7 @@ class ProfileApiServiceTest {
             try {
                 profileApiService.createProfile(
                     "Bearer candidate-secret-token",
-                    CreateProfileRequest(displayName = "Test Borrower")
+                    CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
                 )
                 fail("Expected 401 from redirect target")
             } catch (e: HttpException) {

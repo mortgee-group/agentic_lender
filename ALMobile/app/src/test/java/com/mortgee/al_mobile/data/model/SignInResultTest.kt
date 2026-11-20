@@ -20,6 +20,9 @@ class SignInResultTest {
         assertFalse(SignInResult.GenericFailure.isSuccess)
         assertFalse(SignInResult.InvalidEmail.isSuccess)
         assertFalse(SignInResult.WeakPassword.isSuccess)
+        assertFalse(SignInResult.InvalidFirstName.isSuccess)
+        assertFalse(SignInResult.InvalidLastName.isSuccess)
+        assertFalse(SignInResult.InvalidPhoneNumber.isSuccess)
         assertFalse(SignInResult.InvalidDisplayName.isSuccess)
         assertFalse(SignInResult.AccountExists.isSuccess)
         assertFalse(SignInResult.CompletionNeeded.isSuccess)
@@ -39,6 +42,9 @@ class SignInResultTest {
             SignInResult.GenericFailure,
             SignInResult.InvalidEmail,
             SignInResult.WeakPassword,
+            SignInResult.InvalidFirstName,
+            SignInResult.InvalidLastName,
+            SignInResult.InvalidPhoneNumber,
             SignInResult.InvalidDisplayName,
             SignInResult.AccountExists,
             SignInResult.CompletionNeeded,
@@ -57,13 +63,16 @@ class SignInResultTest {
                 SignInResult.GenericFailure -> "GenericFailure"
                 SignInResult.InvalidEmail -> "InvalidEmail"
                 SignInResult.WeakPassword -> "WeakPassword"
+                SignInResult.InvalidFirstName -> "InvalidFirstName"
+                SignInResult.InvalidLastName -> "InvalidLastName"
+                SignInResult.InvalidPhoneNumber -> "InvalidPhoneNumber"
                 SignInResult.InvalidDisplayName -> "InvalidDisplayName"
                 SignInResult.AccountExists -> "AccountExists"
                 SignInResult.CompletionNeeded -> "CompletionNeeded"
             }
         }
 
-        assertEquals(14, mappedNames.size)
+        assertEquals(17, mappedNames.size)
         assertEquals(
             listOf(
                 "Success",
@@ -77,6 +86,9 @@ class SignInResultTest {
                 "GenericFailure",
                 "InvalidEmail",
                 "WeakPassword",
+                "InvalidFirstName",
+                "InvalidLastName",
+                "InvalidPhoneNumber",
                 "InvalidDisplayName",
                 "AccountExists",
                 "CompletionNeeded",

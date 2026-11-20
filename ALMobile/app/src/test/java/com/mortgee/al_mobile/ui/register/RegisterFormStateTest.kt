@@ -13,14 +13,19 @@ class RegisterFormStateTest {
     fun `default state has empty fields, CreateAccount mode, and no submission in progress`() {
         val state = RegisterFormState()
 
-        assertEquals("", state.displayName)
+        assertEquals("", state.firstName)
+        assertEquals("", state.lastName)
+        assertEquals("", state.phoneNumber)
+        assertNull(state.normalizedPhoneNumber)
         assertEquals("", state.email)
         assertEquals("", state.password)
         assertEquals(RegisterMode.CreateAccount, state.mode)
         assertFalse(state.isCompletionMode)
         assertFalse(state.isSubmitting)
         assertNull(state.error)
-        assertNull(state.displayNameError)
+        assertNull(state.firstNameError)
+        assertNull(state.lastNameError)
+        assertNull(state.phoneNumberError)
         assertNull(state.emailError)
         assertNull(state.passwordError)
         assertNull(state.formError)
@@ -30,53 +35,92 @@ class RegisterFormStateTest {
     }
 
     @Test
-    fun `inputIsValid requires displayName, email, and password to be non-blank`() {
+    fun `inputIsValid requires firstName 1-30, lastName 1-50, optional phoneNumber up to 20, email, and password`() {
         assertFalse(RegisterFormState().inputIsValid)
 
         assertFalse(
             RegisterFormState(
-                displayName = "",
+                firstName = "",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "Password123!",
             ).inputIsValid
         )
         assertFalse(
             RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "a".repeat(31),
+                lastName = "Borrower",
+                email = "borrower@example.com",
+                password = "Password123!",
+            ).inputIsValid
+        )
+        assertFalse(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "",
+                email = "borrower@example.com",
+                password = "Password123!",
+            ).inputIsValid
+        )
+        assertFalse(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "b".repeat(51),
+                email = "borrower@example.com",
+                password = "Password123!",
+            ).inputIsValid
+        )
+        assertFalse(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "Borrower",
+                phoneNumber = "1".repeat(21),
+                email = "borrower@example.com",
+                password = "Password123!",
+            ).inputIsValid
+        )
+        assertFalse(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "",
                 password = "Password123!",
             ).inputIsValid
         )
         assertFalse(
             RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "",
             ).inputIsValid
         )
-        assertFalse(
-            RegisterFormState(
-                displayName = "   ",
-                email = "   ",
-                password = "   ",
-            ).inputIsValid
-        )
 
-        val validState = RegisterFormState(
-            displayName = "Test Borrower",
+        val validWithoutPhone = RegisterFormState(
+            firstName = "Test",
+            lastName = "Borrower",
             email = "borrower@example.com",
             password = "Password123!",
         )
-        assertTrue(validState.isDisplayNameValid)
-        assertTrue(validState.isEmailValid)
-        assertTrue(validState.isPasswordValid)
-        assertTrue(validState.inputIsValid)
+        assertTrue(validWithoutPhone.isFirstNameValid)
+        assertTrue(validWithoutPhone.isLastNameValid)
+        assertTrue(validWithoutPhone.isPhoneNumberValid)
+        assertNull(validWithoutPhone.normalizedPhoneNumber)
+        assertTrue(validWithoutPhone.isEmailValid)
+        assertTrue(validWithoutPhone.isPasswordValid)
+        assertTrue(validWithoutPhone.inputIsValid)
+
+        val validWithPhone = validWithoutPhone.copy(phoneNumber = "+353871234567")
+        assertTrue(validWithPhone.isPhoneNumberValid)
+        assertEquals("+353871234567", validWithPhone.normalizedPhoneNumber)
+        assertTrue(validWithPhone.inputIsValid)
     }
 
     @Test
     fun `canSubmit requires valid input and not submitting`() {
         val validState = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
             email = "borrower@example.com",
             password = "Password123!",
         )
@@ -85,34 +129,41 @@ class RegisterFormStateTest {
         val submittingState = validState.copy(isSubmitting = true)
         assertFalse(submittingState.canSubmit)
 
-        val invalidState = validState.copy(displayName = "   ")
+        val invalidState = validState.copy(firstName = "   ")
         assertFalse(invalidState.canSubmit)
     }
 
     @Test
-    fun `validate marks blank fields and preserves submitted password exactly`() {
+    fun `validate marks invalid fields and preserves submitted password exactly`() {
         val rawPassword = "  ExactP@ssw0rd!2026  "
         val invalidState = RegisterFormState(
-            displayName = "   ",
+            firstName = "   ",
+            lastName = "",
+            phoneNumber = "1".repeat(25),
             email = "",
             password = rawPassword,
         )
 
         val validated = invalidState.validate()
 
-        assertEquals(SignInResult.InvalidDisplayName, validated.displayNameError)
+        assertEquals(SignInResult.InvalidFirstName, validated.firstNameError)
+        assertEquals(SignInResult.InvalidLastName, validated.lastNameError)
+        assertEquals(SignInResult.InvalidPhoneNumber, validated.phoneNumberError)
         assertEquals(SignInResult.InvalidEmail, validated.emailError)
         assertNull(validated.passwordError)
-        assertEquals(SignInResult.InvalidDisplayName, validated.error)
+        assertEquals(SignInResult.InvalidFirstName, validated.error)
         assertEquals(rawPassword, validated.password)
 
         val missingPasswordState = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
             email = "borrower@example.com",
             password = "",
         ).validate()
 
-        assertNull(missingPasswordState.displayNameError)
+        assertNull(missingPasswordState.firstNameError)
+        assertNull(missingPasswordState.lastNameError)
+        assertNull(missingPasswordState.phoneNumberError)
         assertNull(missingPasswordState.emailError)
         assertEquals(SignInResult.WeakPassword, missingPasswordState.passwordError)
         assertEquals(SignInResult.WeakPassword, missingPasswordState.error)
@@ -120,18 +171,31 @@ class RegisterFormStateTest {
 
     @Test
     fun `field update helpers clear only the corresponding field error`() {
-        val validated = RegisterFormState().validate()
-        assertEquals(SignInResult.InvalidDisplayName, validated.displayNameError)
+        val validated = RegisterFormState(
+            phoneNumber = "1".repeat(25),
+        ).validate()
+        assertEquals(SignInResult.InvalidFirstName, validated.firstNameError)
+        assertEquals(SignInResult.InvalidLastName, validated.lastNameError)
+        assertEquals(SignInResult.InvalidPhoneNumber, validated.phoneNumberError)
         assertEquals(SignInResult.InvalidEmail, validated.emailError)
         assertEquals(SignInResult.WeakPassword, validated.passwordError)
 
-        val afterName = validated.withDisplayName("Test Borrower")
-        assertEquals("Test Borrower", afterName.displayName)
-        assertNull(afterName.displayNameError)
-        assertEquals(SignInResult.InvalidEmail, afterName.emailError)
-        assertEquals(SignInResult.WeakPassword, afterName.passwordError)
+        val afterFirstName = validated.withFirstName("Test")
+        assertEquals("Test", afterFirstName.firstName)
+        assertNull(afterFirstName.firstNameError)
+        assertEquals(SignInResult.InvalidLastName, afterFirstName.lastNameError)
 
-        val afterEmail = afterName.withEmail("borrower@example.com")
+        val afterLastName = afterFirstName.withLastName("Borrower")
+        assertEquals("Borrower", afterLastName.lastName)
+        assertNull(afterLastName.lastNameError)
+        assertEquals(SignInResult.InvalidPhoneNumber, afterLastName.phoneNumberError)
+
+        val afterPhone = afterLastName.withPhoneNumber("+353871234567")
+        assertEquals("+353871234567", afterPhone.phoneNumber)
+        assertNull(afterPhone.phoneNumberError)
+        assertEquals(SignInResult.InvalidEmail, afterPhone.emailError)
+
+        val afterEmail = afterPhone.withEmail("borrower@example.com")
         assertEquals("borrower@example.com", afterEmail.email)
         assertNull(afterEmail.emailError)
         assertEquals(SignInResult.WeakPassword, afterEmail.passwordError)
@@ -146,7 +210,9 @@ class RegisterFormStateTest {
     fun `toString masks password and keeps raw password out of state dumps`() {
         val rawPassword = "SuperSecretRegisterPassword123!"
         val state = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
             email = "borrower@example.com",
             password = rawPassword,
             mode = RegisterMode.CreateAccount,
@@ -156,32 +222,39 @@ class RegisterFormStateTest {
 
         assertFalse("State dump must not contain cleartext password", stringDump.contains(rawPassword))
         assertTrue("State dump must contain masked password token", stringDump.contains("[REDACTED]"))
-        assertTrue("State dump must contain displayName", stringDump.contains("Test Borrower"))
+        assertTrue("State dump must contain firstName", stringDump.contains("Test"))
+        assertTrue("State dump must contain lastName", stringDump.contains("Borrower"))
         assertTrue("State dump must contain email", stringDump.contains("borrower@example.com"))
     }
 
     @Test
     fun `toString indicates empty password when password is empty`() {
         val state = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
             email = "borrower@example.com",
             password = "",
         )
         val stringDump = state.toString()
 
         assertTrue(stringDump.contains("<empty>"))
-        assertTrue(stringDump.contains("Test Borrower"))
+        assertTrue(stringDump.contains("Test"))
+        assertTrue(stringDump.contains("Borrower"))
         assertTrue(stringDump.contains("borrower@example.com"))
     }
 
     @Test
     fun `onAttemptStarted sets isSubmitting to true and clears previous field and form errors`() {
         val state = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
             email = "borrower@example.com",
             password = "Password123!",
             error = SignInResult.Connectivity,
-            displayNameError = SignInResult.InvalidDisplayName,
+            firstNameError = SignInResult.InvalidFirstName,
+            lastNameError = SignInResult.InvalidLastName,
+            phoneNumberError = SignInResult.InvalidPhoneNumber,
             emailError = SignInResult.InvalidEmail,
             passwordError = SignInResult.WeakPassword,
         )
@@ -190,30 +263,40 @@ class RegisterFormStateTest {
 
         assertTrue(started.isSubmitting)
         assertNull(started.error)
-        assertNull(started.displayNameError)
+        assertNull(started.firstNameError)
+        assertNull(started.lastNameError)
+        assertNull(started.phoneNumberError)
         assertNull(started.emailError)
         assertNull(started.passwordError)
-        assertEquals("Test Borrower", started.displayName)
+        assertEquals("Test", started.firstName)
+        assertEquals("Borrower", started.lastName)
+        assertEquals("+353871234567", started.phoneNumber)
         assertEquals("borrower@example.com", started.email)
         assertEquals("Password123!", started.password)
     }
 
     @Test
-    fun `onAttemptEnded preserves approved fields displayName and email, clears password, and maps field errors`() {
+    fun `onAttemptEnded preserves approved fields, clears password, and maps field errors`() {
         val initial = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
             email = "borrower@example.com",
             password = "Password123!",
             isSubmitting = true,
         )
 
         val emailRejected = initial.onAttemptEnded(SignInResult.InvalidEmail)
-        assertEquals("Test Borrower", emailRejected.displayName)
+        assertEquals("Test", emailRejected.firstName)
+        assertEquals("Borrower", emailRejected.lastName)
+        assertEquals("+353871234567", emailRejected.phoneNumber)
         assertEquals("borrower@example.com", emailRejected.email)
         assertEquals("", emailRejected.password)
         assertFalse(emailRejected.isSubmitting)
         assertEquals(SignInResult.InvalidEmail, emailRejected.emailError)
-        assertNull(emailRejected.displayNameError)
+        assertNull(emailRejected.firstNameError)
+        assertNull(emailRejected.lastNameError)
+        assertNull(emailRejected.phoneNumberError)
         assertNull(emailRejected.passwordError)
         assertNull(emailRejected.formError)
         assertEquals(RegisterMode.CreateAccount, emailRejected.mode)
@@ -225,32 +308,43 @@ class RegisterFormStateTest {
     }
 
     @Test
-    fun `onAttemptEnded with InvalidDisplayName retains field error and switches mode to CompleteExisting`() {
+    fun `onAttemptEnded with correctable profile field error retains field error and switches mode to CompleteExisting`() {
         val initial = RegisterFormState(
-            displayName = "Bad Name",
+            firstName = "BadName",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
             email = "borrower@example.com",
             password = "Password123!",
             mode = RegisterMode.CreateAccount,
             isSubmitting = true,
         )
 
-        val ended = initial.onAttemptEnded(SignInResult.InvalidDisplayName)
+        val endedFirstName = initial.onAttemptEnded(SignInResult.InvalidFirstName)
+        assertEquals("BadName", endedFirstName.firstName)
+        assertEquals("Borrower", endedFirstName.lastName)
+        assertEquals("borrower@example.com", endedFirstName.email)
+        assertEquals("", endedFirstName.password)
+        assertFalse(endedFirstName.isSubmitting)
+        assertEquals(SignInResult.InvalidFirstName, endedFirstName.firstNameError)
+        assertEquals(SignInResult.InvalidFirstName, endedFirstName.error)
+        assertNull(endedFirstName.formError)
+        assertEquals(RegisterMode.CompleteExisting, endedFirstName.mode)
+        assertTrue(endedFirstName.isCompletionMode)
 
-        assertEquals("Bad Name", ended.displayName)
-        assertEquals("borrower@example.com", ended.email)
-        assertEquals("", ended.password)
-        assertFalse(ended.isSubmitting)
-        assertEquals(SignInResult.InvalidDisplayName, ended.displayNameError)
-        assertEquals(SignInResult.InvalidDisplayName, ended.error)
-        assertNull(ended.formError)
-        assertEquals(RegisterMode.CompleteExisting, ended.mode)
-        assertTrue(ended.isCompletionMode)
+        val endedLastName = initial.onAttemptEnded(SignInResult.InvalidLastName)
+        assertEquals(SignInResult.InvalidLastName, endedLastName.lastNameError)
+        assertEquals(RegisterMode.CompleteExisting, endedLastName.mode)
+
+        val endedPhone = initial.onAttemptEnded(SignInResult.InvalidPhoneNumber)
+        assertEquals(SignInResult.InvalidPhoneNumber, endedPhone.phoneNumberError)
+        assertEquals(RegisterMode.CompleteExisting, endedPhone.mode)
     }
 
     @Test
     fun `onAttemptEnded with AccountExists or CompletionNeeded exposes formError and offers completion mode`() {
         val initial = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
             email = "borrower@example.com",
             password = "Password123!",
             isSubmitting = true,
@@ -276,25 +370,33 @@ class RegisterFormStateTest {
     @Test
     fun `clearPassword and clearErrors preserve approved fields while clearing transient password and errors`() {
         val state = RegisterFormState(
-            displayName = "Test Borrower",
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
             email = "borrower@example.com",
             password = "SecretPassword123!",
             mode = RegisterMode.CompleteExisting,
-            error = SignInResult.InvalidDisplayName,
-            displayNameError = SignInResult.InvalidDisplayName,
+            error = SignInResult.InvalidFirstName,
+            firstNameError = SignInResult.InvalidFirstName,
+            lastNameError = SignInResult.InvalidLastName,
+            phoneNumberError = SignInResult.InvalidPhoneNumber,
             emailError = SignInResult.InvalidEmail,
             passwordError = SignInResult.WeakPassword,
         )
 
         val passwordCleared = state.clearPassword()
-        assertEquals("Test Borrower", passwordCleared.displayName)
+        assertEquals("Test", passwordCleared.firstName)
+        assertEquals("Borrower", passwordCleared.lastName)
+        assertEquals("+353871234567", passwordCleared.phoneNumber)
         assertEquals("borrower@example.com", passwordCleared.email)
         assertEquals("", passwordCleared.password)
         assertEquals(RegisterMode.CompleteExisting, passwordCleared.mode)
 
         val errorsCleared = passwordCleared.clearErrors()
         assertNull(errorsCleared.error)
-        assertNull(errorsCleared.displayNameError)
+        assertNull(errorsCleared.firstNameError)
+        assertNull(errorsCleared.lastNameError)
+        assertNull(errorsCleared.phoneNumberError)
         assertNull(errorsCleared.emailError)
         assertNull(errorsCleared.passwordError)
         assertEquals(RegisterMode.CompleteExisting, errorsCleared.mode)
@@ -317,22 +419,50 @@ class RegisterFormStateTest {
             }
         }
 
-        // Blank display name
-        val blankName = submitIfValid(
+        // Blank first name
+        val blankFirstName = submitIfValid(
             RegisterFormState(
-                displayName = "   ",
+                firstName = "   ",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "Password123!",
             )
         )
         assertEquals(0, repositoryCalls)
-        assertEquals(SignInResult.InvalidDisplayName, blankName.displayNameError)
-        assertEquals("Password123!", blankName.password)
+        assertEquals(SignInResult.InvalidFirstName, blankFirstName.firstNameError)
+        assertEquals("Password123!", blankFirstName.password)
+
+        // Blank last name
+        val blankLastName = submitIfValid(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "   ",
+                email = "borrower@example.com",
+                password = "Password123!",
+            )
+        )
+        assertEquals(0, repositoryCalls)
+        assertEquals(SignInResult.InvalidLastName, blankLastName.lastNameError)
+        assertEquals("Password123!", blankLastName.password)
+
+        // Overlength phone number
+        val overlengthPhone = submitIfValid(
+            RegisterFormState(
+                firstName = "Test",
+                lastName = "Borrower",
+                phoneNumber = "123456789012345678901",
+                email = "borrower@example.com",
+                password = "Password123!",
+            )
+        )
+        assertEquals(0, repositoryCalls)
+        assertEquals(SignInResult.InvalidPhoneNumber, overlengthPhone.phoneNumberError)
 
         // Blank email
         val blankEmail = submitIfValid(
             RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "   ",
                 password = "Password123!",
             )
@@ -344,7 +474,8 @@ class RegisterFormStateTest {
         // Missing password
         val missingPassword = submitIfValid(
             RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "",
             )

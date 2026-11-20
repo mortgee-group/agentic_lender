@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,8 +54,9 @@ import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 /**
  * Borrower Registration Screen Composable.
  *
- * Renders controlled inputs for Borrower display name, email, and password using Compose and
- * Material 3 theme conventions.
+ * Renders controlled inputs for Borrower first name, last name, optional phone number, email,
+ * and password using Compose and Material 3 theme conventions.
+ * - Keeps the fixed Borrower role outside the form.
  * - Masks the password credential by default using [PasswordVisualTransformation].
  * - Displays safe field-level and form-level error messages without leaking credentials, tokens, or raw exceptions.
  * - Disables editing and prevents duplicate submission while [RegisterFormState.isSubmitting] is true.
@@ -67,7 +69,9 @@ import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 @Composable
 fun RegisterScreen(
     formState: RegisterFormState,
-    onDisplayNameChange: (String) -> Unit,
+    onFirstNameChange: (String) -> Unit,
+    onLastNameChange: (String) -> Unit,
+    onPhoneNumberChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
@@ -97,9 +101,9 @@ fun RegisterScreen(
     }
 
     val headerSubtitle = if (formState.isCompletionMode) {
-        "Enter your existing account credentials and display name to complete your Borrower profile"
+        "Enter your existing account credentials and profile details to complete your Borrower registration"
     } else {
-        "Provide your display name, email, and password to register"
+        "Provide your first name, last name, optional phone number, email, and password to register"
     }
 
     Scaffold(
@@ -142,20 +146,20 @@ fun RegisterScreen(
                     )
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Display Name Field
+                    // First Name Field
                     OutlinedTextField(
-                        value = formState.displayName,
-                        onValueChange = { if (!formState.isSubmitting) onDisplayNameChange(it) },
-                        label = { Text("Display Name") },
-                        placeholder = { Text("Test Borrower") },
+                        value = formState.firstName,
+                        onValueChange = { if (!formState.isSubmitting) onFirstNameChange(it) },
+                        label = { Text("First Name") },
+                        placeholder = { Text("Test") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Person,
-                                contentDescription = "Display Name Icon",
+                                contentDescription = "First Name Icon",
                             )
                         },
-                        isError = formState.displayNameError != null,
-                        supportingText = formState.displayNameError?.let { fieldError ->
+                        isError = formState.firstNameError != null,
+                        supportingText = formState.firstNameError?.let { fieldError ->
                             {
                                 Text(
                                     text = formatRegisterErrorMessage(fieldError),
@@ -167,6 +171,68 @@ fun RegisterScreen(
                         enabled = !formState.isSubmitting,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Next,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Last Name Field
+                    OutlinedTextField(
+                        value = formState.lastName,
+                        onValueChange = { if (!formState.isSubmitting) onLastNameChange(it) },
+                        label = { Text("Last Name") },
+                        placeholder = { Text("Borrower") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Last Name Icon",
+                            )
+                        },
+                        isError = formState.lastNameError != null,
+                        supportingText = formState.lastNameError?.let { fieldError ->
+                            {
+                                Text(
+                                    text = formatRegisterErrorMessage(fieldError),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        singleLine = true,
+                        enabled = !formState.isSubmitting,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Next,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Optional Phone Number Field
+                    OutlinedTextField(
+                        value = formState.phoneNumber,
+                        onValueChange = { if (!formState.isSubmitting) onPhoneNumberChange(it) },
+                        label = { Text("Phone Number (Optional)") },
+                        placeholder = { Text("+353871234567") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Phone,
+                                contentDescription = "Phone Number Icon",
+                            )
+                        },
+                        isError = formState.phoneNumberError != null,
+                        supportingText = formState.phoneNumberError?.let { fieldError ->
+                            {
+                                Text(
+                                    text = formatRegisterErrorMessage(fieldError),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        singleLine = true,
+                        enabled = !formState.isSubmitting,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Phone,
                             imeAction = ImeAction.Next,
                         ),
                         modifier = Modifier.fillMaxWidth(),
@@ -410,7 +476,10 @@ internal fun resolvePasswordVisualTransformation(
  */
 internal fun formatRegisterErrorMessage(result: SignInResult): String {
     return when (result) {
-        SignInResult.InvalidDisplayName -> "Please enter a valid display name."
+        SignInResult.InvalidFirstName -> "Please enter a valid first name (1–30 characters)."
+        SignInResult.InvalidLastName -> "Please enter a valid last name (1–50 characters)."
+        SignInResult.InvalidPhoneNumber -> "Phone number must be 20 characters or fewer."
+        SignInResult.InvalidDisplayName -> "Please enter a valid name."
         SignInResult.InvalidEmail -> "Please enter a valid email address."
         SignInResult.WeakPassword -> "Password does not meet security requirements."
         SignInResult.AccountExists ->
@@ -436,12 +505,16 @@ fun RegisterScreenCreatePreview() {
     ALMobileTheme {
         RegisterScreen(
             formState = RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
+                phoneNumber = "+353871234567",
                 email = "borrower@example.com",
                 password = "password123",
                 mode = RegisterMode.CreateAccount,
             ),
-            onDisplayNameChange = {},
+            onFirstNameChange = {},
+            onLastNameChange = {},
+            onPhoneNumberChange = {},
             onEmailChange = {},
             onPasswordChange = {},
             onSubmit = {},
@@ -456,13 +529,16 @@ fun RegisterScreenSubmittingPreview() {
     ALMobileTheme {
         RegisterScreen(
             formState = RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "password123",
                 mode = RegisterMode.CreateAccount,
                 isSubmitting = true,
             ),
-            onDisplayNameChange = {},
+            onFirstNameChange = {},
+            onLastNameChange = {},
+            onPhoneNumberChange = {},
             onEmailChange = {},
             onPasswordChange = {},
             onSubmit = {},
@@ -476,13 +552,16 @@ fun RegisterScreenCompletionNeededPreview() {
     ALMobileTheme {
         RegisterScreen(
             formState = RegisterFormState(
-                displayName = "Test Borrower",
+                firstName = "Test",
+                lastName = "Borrower",
                 email = "borrower@example.com",
                 password = "",
                 mode = RegisterMode.CreateAccount,
                 error = SignInResult.AccountExists,
             ),
-            onDisplayNameChange = {},
+            onFirstNameChange = {},
+            onLastNameChange = {},
+            onPhoneNumberChange = {},
             onEmailChange = {},
             onPasswordChange = {},
             onSubmit = {},
@@ -498,7 +577,9 @@ fun RegisterScreenFieldErrorsPreview() {
     ALMobileTheme {
         RegisterScreen(
             formState = RegisterFormState().validate(),
-            onDisplayNameChange = {},
+            onFirstNameChange = {},
+            onLastNameChange = {},
+            onPhoneNumberChange = {},
             onEmailChange = {},
             onPasswordChange = {},
             onSubmit = {},

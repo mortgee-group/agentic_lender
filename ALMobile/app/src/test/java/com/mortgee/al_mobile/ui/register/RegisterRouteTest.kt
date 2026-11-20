@@ -43,7 +43,8 @@ class RegisterRouteTest {
     @Test
     fun `rotation while submission is active retains in-flight submission and form state without starting another call`() = runTest {
         // 1. User enters fields on RegisterRoute
-        viewModel.onDisplayNameChanged("Test Borrower")
+        viewModel.onFirstNameChanged("Test")
+        viewModel.onLastNameChanged("Borrower")
         viewModel.onEmailChanged("borrower@example.com")
         viewModel.onPasswordChanged("Password123!")
 
@@ -62,7 +63,8 @@ class RegisterRouteTest {
         // 3. Simulate device rotation: RegisterRoute recomposes and re-collects viewModel.formState
         val stateAfterRotation = viewModel.formState.value
         assertTrue(stateAfterRotation.isSubmitting)
-        assertEquals("Test Borrower", stateAfterRotation.displayName)
+        assertEquals("Test", stateAfterRotation.firstName)
+        assertEquals("Borrower", stateAfterRotation.lastName)
         assertEquals("borrower@example.com", stateAfterRotation.email)
         assertEquals(RegisterMode.CreateAccount, stateAfterRotation.mode)
 
@@ -79,7 +81,8 @@ class RegisterRouteTest {
 
         val completedState = viewModel.formState.value
         assertFalse(completedState.isSubmitting)
-        assertEquals("Test Borrower", completedState.displayName)
+        assertEquals("Test", completedState.firstName)
+        assertEquals("Borrower", completedState.lastName)
         assertEquals("borrower@example.com", completedState.email)
         assertEquals("", completedState.password)
         assertNull(completedState.error)
@@ -89,7 +92,8 @@ class RegisterRouteTest {
     @Test
     fun `rotation in CompleteExisting mode retains active completion submission without starting another call`() = runTest {
         viewModel.selectCompletionMode()
-        viewModel.onDisplayNameChanged("Existing Borrower")
+        viewModel.onFirstNameChanged("Existing")
+        viewModel.onLastNameChanged("Borrower")
         viewModel.onEmailChanged("existing@example.com")
         viewModel.onPasswordChanged("ExistingPass123!")
 
@@ -103,7 +107,8 @@ class RegisterRouteTest {
         val stateAfterRotation = viewModel.formState.value
         assertTrue(stateAfterRotation.isSubmitting)
         assertEquals(RegisterMode.CompleteExisting, stateAfterRotation.mode)
-        assertEquals("Existing Borrower", stateAfterRotation.displayName)
+        assertEquals("Existing", stateAfterRotation.firstName)
+        assertEquals("Borrower", stateAfterRotation.lastName)
         assertEquals("existing@example.com", stateAfterRotation.email)
         assertEquals(0, fakeRepository.registerCallCount)
         assertEquals(1, fakeRepository.completeRegistrationCallCount)
@@ -134,7 +139,8 @@ class RegisterRouteTest {
         assertEquals(RegisterMode.CompleteExisting, viewModel.formState.value.mode)
 
         // 2. User enters fields and submits
-        viewModel.onDisplayNameChanged("Test Borrower")
+        viewModel.onFirstNameChanged("Test")
+        viewModel.onLastNameChanged("Borrower")
         viewModel.onEmailChanged("borrower@example.com")
         viewModel.onPasswordChanged("Password123!")
 
@@ -152,7 +158,8 @@ class RegisterRouteTest {
             initialMode = RegisterMode.CompleteExisting,
         )
         assertTrue(viewModel.formState.value.isSubmitting)
-        assertEquals("Test Borrower", viewModel.formState.value.displayName)
+        assertEquals("Test", viewModel.formState.value.firstName)
+        assertEquals("Borrower", viewModel.formState.value.lastName)
         assertEquals("borrower@example.com", viewModel.formState.value.email)
         assertEquals(1, fakeRepository.completeRegistrationCallCount)
 
@@ -165,7 +172,9 @@ class RegisterRouteTest {
             initialMode = RegisterMode.CreateAccount,
         )
         val freshState = viewModel.formState.value
-        assertEquals("", freshState.displayName)
+        assertEquals("", freshState.firstName)
+        assertEquals("", freshState.lastName)
+        assertEquals("", freshState.phoneNumber)
         assertEquals("", freshState.email)
         assertEquals("", freshState.password)
         assertEquals(RegisterMode.CreateAccount, freshState.mode)
@@ -189,7 +198,9 @@ class RegisterRouteTest {
         override suspend fun register(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             registerCallCount++
             return pendingRegisterResult?.await() ?: SignInResult.Success
@@ -198,7 +209,9 @@ class RegisterRouteTest {
         override suspend fun completeRegistration(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult {
             completeRegistrationCallCount++
             return pendingCompleteResult?.await() ?: SignInResult.Success

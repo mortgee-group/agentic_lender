@@ -105,8 +105,11 @@ class HiltModulesTest {
                 return UserProfileDto(
                     uid = "uid-1",
                     email = "borrower@example.com",
-                    role = "borrower",
-                    displayName = request.displayName,
+                    role = request.role,
+                    displayName = "${request.firstName} ${request.lastName}",
+                    firstName = request.firstName,
+                    lastName = request.lastName,
+                    phoneNumber = request.phoneNumber,
                 )
             }
         }

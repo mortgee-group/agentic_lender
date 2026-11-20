@@ -16,9 +16,11 @@ import javax.inject.Inject
  * ViewModel for the Borrower registration screen.
  *
  * Manages [RegisterFormState], validates input fields, snapshots transient credentials and
- * display name upon submit, sets busy status synchronously prior to launching coroutine work,
- * selects either [AccountRepository.register] or [AccountRepository.completeRegistration]
- * according to [RegisterMode], and clears transient password state upon completion.
+ * profile fields ([RegisterFormState.firstName], [RegisterFormState.lastName], and optional
+ * [RegisterFormState.phoneNumber]) upon submit, sets busy status synchronously prior to launching
+ * coroutine work, selects either [AccountRepository.register] or
+ * [AccountRepository.completeRegistration] according to [RegisterMode], and clears transient
+ * password state upon completion.
  */
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
@@ -29,10 +31,24 @@ class RegisterViewModel @Inject constructor(
     val formState: StateFlow<RegisterFormState> = _formState.asStateFlow()
 
     /**
-     * Updates the display name input field in [formState] and clears any active display name error.
+     * Updates the first name input field in [formState] and clears any active first name error.
      */
-    fun updateDisplayName(displayName: String) {
-        _formState.update { it.withDisplayName(displayName) }
+    fun updateFirstName(firstName: String) {
+        _formState.update { it.withFirstName(firstName) }
+    }
+
+    /**
+     * Updates the last name input field in [formState] and clears any active last name error.
+     */
+    fun updateLastName(lastName: String) {
+        _formState.update { it.withLastName(lastName) }
+    }
+
+    /**
+     * Updates the optional phone number input field in [formState] and clears any active phone number error.
+     */
+    fun updatePhoneNumber(phoneNumber: String) {
+        _formState.update { it.withPhoneNumber(phoneNumber) }
     }
 
     /**
@@ -50,9 +66,19 @@ class RegisterViewModel @Inject constructor(
     }
 
     /**
-     * Convenience callback alias for updating display name.
+     * Convenience callback alias for updating first name.
      */
-    fun onDisplayNameChanged(displayName: String) = updateDisplayName(displayName)
+    fun onFirstNameChanged(firstName: String) = updateFirstName(firstName)
+
+    /**
+     * Convenience callback alias for updating last name.
+     */
+    fun onLastNameChanged(lastName: String) = updateLastName(lastName)
+
+    /**
+     * Convenience callback alias for updating optional phone number.
+     */
+    fun onPhoneNumberChanged(phoneNumber: String) = updatePhoneNumber(phoneNumber)
 
     /**
      * Convenience callback alias for updating email.
@@ -123,11 +149,12 @@ class RegisterViewModel @Inject constructor(
      * Validates and submits the registration inputs currently held in [formState] to [AccountRepository].
      *
      * - Ignores duplicate submissions while [RegisterFormState.isSubmitting] is true.
-     * - Validates local input rules via [RegisterFormState.validate] and marks blank fields without
+     * - Validates local input rules via [RegisterFormState.validate] and marks invalid fields without
      *   calling the repository or modifying the entered password.
-     * - Snapshots [RegisterFormState.displayName], [RegisterFormState.email], [RegisterFormState.password],
-     *   and [RegisterFormState.mode] and sets [RegisterFormState.isSubmitting] synchronously before launching
-     *   the coroutine.
+     * - Snapshots [RegisterFormState.firstName], [RegisterFormState.lastName],
+     *   [RegisterFormState.normalizedPhoneNumber], [RegisterFormState.email],
+     *   [RegisterFormState.password], and [RegisterFormState.mode] and sets
+     *   [RegisterFormState.isSubmitting] synchronously before launching the coroutine.
      * - Calls [AccountRepository.completeRegistration] when in [RegisterMode.CompleteExisting], or
      *   [AccountRepository.register] when in [RegisterMode.CreateAccount].
      * - Clears the transient password and updates error/mode state in `finally`.
@@ -144,7 +171,9 @@ class RegisterViewModel @Inject constructor(
             return
         }
 
-        val submittedDisplayName = validatedState.displayName
+        val submittedFirstName = validatedState.firstName
+        val submittedLastName = validatedState.lastName
+        val submittedPhoneNumber = validatedState.normalizedPhoneNumber
         val submittedEmail = validatedState.email
         val submittedPassword = validatedState.password
         val isCompleting = validatedState.mode == RegisterMode.CompleteExisting
@@ -158,13 +187,17 @@ class RegisterViewModel @Inject constructor(
                     accountRepository.completeRegistration(
                         email = submittedEmail,
                         password = submittedPassword,
-                        displayName = submittedDisplayName,
+                        firstName = submittedFirstName,
+                        lastName = submittedLastName,
+                        phoneNumber = submittedPhoneNumber,
                     )
                 } else {
                     accountRepository.register(
                         email = submittedEmail,
                         password = submittedPassword,
-                        displayName = submittedDisplayName,
+                        firstName = submittedFirstName,
+                        lastName = submittedLastName,
+                        phoneNumber = submittedPhoneNumber,
                     )
                 }
             } finally {

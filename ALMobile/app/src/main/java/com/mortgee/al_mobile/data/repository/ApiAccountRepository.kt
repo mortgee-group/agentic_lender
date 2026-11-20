@@ -123,8 +123,14 @@ class ApiAccountRepository @Inject constructor(
     override suspend fun register(
         email: String,
         password: String,
-        displayName: String,
+        firstName: String,
+        lastName: String,
+        phoneNumber: String?,
     ): SignInResult {
+        validateProfileFields(firstName, lastName, phoneNumber)?.let { fieldError ->
+            return fieldError
+        }
+
         val attempt = sessionOwner.startSignInAttempt() ?: return SignInResult.Busy
 
         return try {
@@ -146,7 +152,9 @@ class ApiAccountRepository @Inject constructor(
                 attempt = attempt,
                 candidateUid = candidateUser.uid,
                 bearerHeader = "Bearer $token",
-                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
+                phoneNumber = phoneNumber,
             )
         } catch (e: CancellationException) {
             sessionOwner.cancelAttempt(attempt)
@@ -160,7 +168,9 @@ class ApiAccountRepository @Inject constructor(
     override suspend fun completeRegistration(
         email: String,
         password: String,
-        displayName: String,
+        firstName: String,
+        lastName: String,
+        phoneNumber: String?,
     ): SignInResult {
         val attempt = sessionOwner.startSignInAttempt() ?: return SignInResult.Busy
 
@@ -187,7 +197,7 @@ class ApiAccountRepository @Inject constructor(
             val existingProfile = try {
                 profileApiService.getProfile(bearerHeader)
             } catch (e: HttpException) {
-                if (e.code() == 404) {
+                if (e.code() == 404 && isConfirmedMissingProfile404(e)) {
                     null
                 } else {
                     sessionOwner.cancelAttempt(attempt)
@@ -209,11 +219,19 @@ class ApiAccountRepository @Inject constructor(
                 )
             }
 
+            val localFieldError = validateProfileFields(firstName, lastName, phoneNumber)
+            if (localFieldError != null) {
+                sessionOwner.cancelAttempt(attempt)
+                return localFieldError
+            }
+
             return createAndCommitBorrowerProfile(
                 attempt = attempt,
                 candidateUid = candidateUser.uid,
                 bearerHeader = bearerHeader,
-                displayName = displayName,
+                firstName = firstName,
+                lastName = lastName,
+                phoneNumber = phoneNumber,
             )
         } catch (e: CancellationException) {
             sessionOwner.cancelAttempt(attempt)
@@ -228,7 +246,9 @@ class ApiAccountRepository @Inject constructor(
         attempt: SessionAttempt,
         candidateUid: String,
         bearerHeader: String,
-        displayName: String,
+        firstName: String,
+        lastName: String,
+        phoneNumber: String?,
     ): SignInResult {
         if (!sessionOwner.isAttemptCurrent(attempt)) {
             return SignInResult.GenericFailure
@@ -237,7 +257,11 @@ class ApiAccountRepository @Inject constructor(
         val profile = try {
             profileApiService.createProfile(
                 bearerToken = bearerHeader,
-                request = CreateProfileRequest(displayName = displayName),
+                request = CreateProfileRequest.forBorrower(
+                    firstName = firstName,
+                    lastName = lastName,
+                    phoneNumber = phoneNumber,
+                ),
             )
         } catch (e: HttpException) {
             if (e.code() == 409) {
@@ -446,6 +470,40 @@ class ApiAccountRepository @Inject constructor(
         }
     }
 
+    private fun validateProfileFields(
+        firstName: String,
+        lastName: String,
+        phoneNumber: String?,
+    ): SignInResult? {
+        if (firstName.isBlank() || firstName.length > MAX_FIRST_NAME_LENGTH) {
+            return SignInResult.InvalidFirstName
+        }
+        if (lastName.isBlank() || lastName.length > MAX_LAST_NAME_LENGTH) {
+            return SignInResult.InvalidLastName
+        }
+        if (phoneNumber != null && phoneNumber.isNotBlank() && phoneNumber.length > MAX_PHONE_NUMBER_LENGTH) {
+            return SignInResult.InvalidPhoneNumber
+        }
+        return null
+    }
+
+    private fun isConfirmedMissingProfile404(e: HttpException): Boolean {
+        val response = e.response()
+        val requestPath = response?.raw()?.request?.url?.encodedPath
+        if (requestPath != null && requestPath != "/" && !requestPath.endsWith("/users/me")) {
+            return false
+        }
+        val errorBody = try {
+            response?.errorBody()?.string()
+        } catch (_: Exception) {
+            null
+        }
+        if (errorBody.isNullOrBlank()) return false
+        val trimmed = errorBody.trim()
+        return trimmed.startsWith("{") && trimmed.endsWith("}") &&
+            MISSING_PROFILE_404_REGEX.containsMatchIn(trimmed)
+    }
+
     private fun mapProfileCreateHttpException(e: HttpException): SignInResult {
         return when (e.code()) {
             400, 401, 403 -> SignInResult.RejectedAuthentication
@@ -456,21 +514,25 @@ class ApiAccountRepository @Inject constructor(
                 } catch (_: Exception) {
                     null
                 }
-                if (isVerifiedDisplayNameError(errorBody)) {
-                    SignInResult.InvalidDisplayName
-                } else {
-                    SignInResult.GenericFailure
-                }
+                mapProfileCreate422Error(errorBody)
             }
             else -> SignInResult.CompletionNeeded
         }
     }
 
-    private fun isVerifiedDisplayNameError(errorBody: String?): Boolean {
-        if (errorBody.isNullOrBlank()) return false
+    private fun mapProfileCreate422Error(errorBody: String?): SignInResult {
+        if (errorBody.isNullOrBlank()) return SignInResult.GenericFailure
         val trimmed = errorBody.trim()
-        return trimmed.startsWith("{") && trimmed.endsWith("}") &&
-            DISPLAY_NAME_FIELD_REGEX.containsMatchIn(trimmed)
+        if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+            return SignInResult.GenericFailure
+        }
+        return when {
+            FIRST_NAME_LOC_REGEX.containsMatchIn(trimmed) -> SignInResult.InvalidFirstName
+            LAST_NAME_LOC_REGEX.containsMatchIn(trimmed) -> SignInResult.InvalidLastName
+            PHONE_NUMBER_LOC_REGEX.containsMatchIn(trimmed) -> SignInResult.InvalidPhoneNumber
+            DISPLAY_NAME_FIELD_REGEX.containsMatchIn(trimmed) -> SignInResult.InvalidDisplayName
+            else -> SignInResult.GenericFailure
+        }
     }
 
     private fun isNetworkException(e: Throwable?): Boolean {
@@ -481,6 +543,23 @@ class ApiAccountRepository @Inject constructor(
     }
 
     companion object {
+        const val MAX_FIRST_NAME_LENGTH = 30
+        const val MAX_LAST_NAME_LENGTH = 50
+        const val MAX_PHONE_NUMBER_LENGTH = 20
+
+        private val FIRST_NAME_LOC_REGEX = Regex(
+            """"loc"\s*:\s*\[\s*"body"\s*,\s*"first_name"\s*]|"(first_name|firstName)""""
+        )
+        private val LAST_NAME_LOC_REGEX = Regex(
+            """"loc"\s*:\s*\[\s*"body"\s*,\s*"last_name"\s*]|"(last_name|lastName)""""
+        )
+        private val PHONE_NUMBER_LOC_REGEX = Regex(
+            """"loc"\s*:\s*\[\s*"body"\s*,\s*"phone_number"\s*]|"(phone_number|phoneNumber)""""
+        )
         private val DISPLAY_NAME_FIELD_REGEX = Regex("\"(display_name|displayName)\"")
+        private val MISSING_PROFILE_404_REGEX = Regex(
+            """"(detail|error)"\s*:\s*"[^"]*(User profile not found|Profile not found|profilestillmissing|missing)[^"]*"""",
+            RegexOption.IGNORE_CASE,
+        )
     }
 }

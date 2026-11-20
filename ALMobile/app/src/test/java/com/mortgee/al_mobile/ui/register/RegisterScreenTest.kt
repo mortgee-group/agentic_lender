@@ -25,6 +25,9 @@ class RegisterScreenTest {
     @Test
     fun `formatRegisterErrorMessage returns safe non-empty messages for all failure outcomes and empty for Success`() {
         val allFailureOutcomes = listOf(
+            SignInResult.InvalidFirstName,
+            SignInResult.InvalidLastName,
+            SignInResult.InvalidPhoneNumber,
             SignInResult.InvalidDisplayName,
             SignInResult.InvalidEmail,
             SignInResult.WeakPassword,

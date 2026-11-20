@@ -19,64 +19,77 @@ class CreateProfileRequestTest {
     }
 
     @Test
-    fun `serializes full UserProfileCreate payload with role, names, and phone`() {
-        val request = CreateProfileRequest(
-            role = "borrower",
-            firstName = "John",
-            lastName = "Doe",
-            phoneNumber = "+1234567890"
+    fun `serializes full UserProfileCreate payload with first_name, last_name, phone_number, and fixed borrower role`() {
+        val request = CreateProfileRequest.forBorrower(
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "+353871234567",
         )
         val adapter = moshi.adapter(CreateProfileRequest::class.java)
         val json = adapter.toJson(request)
 
         assertEquals(
-            """{"role":"borrower","first_name":"John","last_name":"Doe","phone_number":"+1234567890"}""",
-            json
+            """{"first_name":"Test","last_name":"Borrower","phone_number":"+353871234567","role":"borrower"}""",
+            json,
         )
+        assertEquals("borrower", request.role)
     }
 
     @Test
-    fun `serializes payload with display_name only`() {
-        val request = CreateProfileRequest(displayName = "Test Borrower")
+    fun `serializes payload without optional phone_number and converts blank phone to null`() {
+        val absentPhoneRequest = CreateProfileRequest.forBorrower(
+            firstName = "Test",
+            lastName = "Borrower",
+        )
+        val blankPhoneRequest = CreateProfileRequest.forBorrower(
+            firstName = "Test",
+            lastName = "Borrower",
+            phoneNumber = "   ",
+        )
         val adapter = moshi.adapter(CreateProfileRequest::class.java)
-        val json = adapter.toJson(request)
 
-        assertEquals("""{"display_name":"Test Borrower"}""", json)
+        assertNull(absentPhoneRequest.phoneNumber)
+        assertNull(blankPhoneRequest.phoneNumber)
+        assertEquals(
+            """{"first_name":"Test","last_name":"Borrower","role":"borrower"}""",
+            adapter.toJson(absentPhoneRequest),
+        )
+        assertEquals(
+            """{"first_name":"Test","last_name":"Borrower","role":"borrower"}""",
+            adapter.toJson(blankPhoneRequest),
+        )
     }
 
     @Test
     fun `deserializes UserProfileCreate payload from JSON`() {
         val json = """
             {
-                "role": "borrower",
                 "first_name": "Jane",
                 "last_name": "Smith",
                 "phone_number": "+353871234567",
-                "display_name": "Jane Smith"
+                "role": "borrower"
             }
         """.trimIndent()
         val adapter = moshi.adapter(CreateProfileRequest::class.java)
         val request = adapter.fromJson(json)
 
         requireNotNull(request)
-        assertEquals("borrower", request.role)
         assertEquals("Jane", request.firstName)
         assertEquals("Smith", request.lastName)
         assertEquals("+353871234567", request.phoneNumber)
-        assertEquals("Jane Smith", request.displayName)
+        assertEquals("borrower", request.role)
     }
 
     @Test
-    fun `deserializes payload with optional fields omitted`() {
-        val json = """{"display_name":"Test Borrower"}"""
+    fun `deserializes payload with optional phone_number omitted`() {
+        val json = """{"first_name":"Test","last_name":"Borrower","role":"borrower"}"""
         val adapter = moshi.adapter(CreateProfileRequest::class.java)
         val request = adapter.fromJson(json)
 
         requireNotNull(request)
-        assertEquals("Test Borrower", request.displayName)
-        assertNull(request.role)
-        assertNull(request.firstName)
-        assertNull(request.lastName)
+        assertEquals("Test", request.firstName)
+        assertEquals("Borrower", request.lastName)
         assertNull(request.phoneNumber)
+        assertEquals("borrower", request.role)
     }
 }

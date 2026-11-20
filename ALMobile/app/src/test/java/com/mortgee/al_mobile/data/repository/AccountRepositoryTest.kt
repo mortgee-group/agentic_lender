@@ -24,21 +24,25 @@ class AccountRepositoryTest {
             override suspend fun register(
                 email: String,
                 password: String,
-                displayName: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
             ): SignInResult {
-                return if (email.isNotBlank() && password.isNotBlank() && displayName.isNotBlank()) {
+                return if (email.isNotBlank() && password.isNotBlank() && firstName.isNotBlank() && lastName.isNotBlank()) {
                     SignInResult.Success
                 } else {
-                    SignInResult.InvalidDisplayName
+                    SignInResult.InvalidFirstName
                 }
             }
 
             override suspend fun completeRegistration(
                 email: String,
                 password: String,
-                displayName: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
             ): SignInResult {
-                return if (email.isNotBlank() && password.isNotBlank() && displayName.isNotBlank()) {
+                return if (email.isNotBlank() && password.isNotBlank() && firstName.isNotBlank() && lastName.isNotBlank()) {
                     SignInResult.Success
                 } else {
                     SignInResult.InvalidCredentials
@@ -56,11 +60,11 @@ class AccountRepositoryTest {
         )
         assertEquals(
             SignInResult.Success,
-            fakeRepository.register("borrower@example.com", "secret123", "Test Borrower")
+            fakeRepository.register("borrower@example.com", "secret123", "Test", "Borrower", "+353871234567")
         )
         assertEquals(
             SignInResult.Success,
-            fakeRepository.completeRegistration("borrower@example.com", "secret123", "Test Borrower")
+            fakeRepository.completeRegistration("borrower@example.com", "secret123", "Test", "Borrower", null)
         )
     }
 
@@ -76,13 +80,17 @@ class AccountRepositoryTest {
             override suspend fun register(
                 email: String,
                 password: String,
-                displayName: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
             ): SignInResult = SignInResult.Success
 
             override suspend fun completeRegistration(
                 email: String,
                 password: String,
-                displayName: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
             ): SignInResult = SignInResult.Success
         }
 

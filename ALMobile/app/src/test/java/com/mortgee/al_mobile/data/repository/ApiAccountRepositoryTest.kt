@@ -618,7 +618,7 @@ class ApiAccountRepositoryTest {
             updatedAt = "2026-11-19T10:00:00Z"
         )
 
-        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+        val result = repository.register(candidateEmail, "StrongPass123!", "Test", "Borrower", "+1234567890")
 
         assertEquals(SignInResult.Success, result)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
@@ -627,7 +627,11 @@ class ApiAccountRepositoryTest {
         assertEquals(0, fakeProfileApiService.getProfileCount)
         assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
         assertEquals(
-            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest.forBorrower(
+                firstName = "Test",
+                lastName = "Borrower",
+                phoneNumber = "+1234567890"
+            ),
             fakeProfileApiService.lastCreatedRequest
         )
         assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
@@ -647,7 +651,7 @@ class ApiAccountRepositoryTest {
         val activeAttempt = sessionOwner.startSignInAttempt()
         assertTrue(activeAttempt != null)
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.Busy, result)
         assertEquals(0, fakeAuthAdapter.createAccountCount)
@@ -669,7 +673,7 @@ class ApiAccountRepositoryTest {
             displayName = "Test Borrower"
         )
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.RejectedAuthentication, result)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
@@ -694,7 +698,7 @@ class ApiAccountRepositoryTest {
             displayName = "Test Borrower"
         )
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.UnsupportedRole, result)
         assertTrue(fakePartitionManager.preparedUids.isEmpty())
@@ -717,7 +721,7 @@ class ApiAccountRepositoryTest {
             displayName = "Unexpected Broker"
         )
 
-        val result = repository.register("broker@example.com", "StrongPass123!", "Unexpected Broker")
+        val result = repository.register("broker@example.com", "StrongPass123!", "Unexpected", "Broker")
 
         assertEquals(SignInResult.UnsupportedRole, result)
         assertTrue(fakePartitionManager.preparedUids.isEmpty())
@@ -741,7 +745,7 @@ class ApiAccountRepositoryTest {
         )
         fakePartitionManager.shouldSucceed = false
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.GenericFailure, result)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -764,7 +768,7 @@ class ApiAccountRepositoryTest {
         )
         fakeStorage.shouldSaveSucceed = false
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.GenericFailure, result)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -792,7 +796,7 @@ class ApiAccountRepositoryTest {
             displayName = "Stale Borrower"
         )
 
-        val result = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+        val result = repository.register("stale@example.com", "StrongPass123!", "Stale", "Borrower")
 
         assertEquals(SignInResult.GenericFailure, result)
         assertTrue(fakePartitionManager.preparedUids.isEmpty())
@@ -816,7 +820,7 @@ class ApiAccountRepositoryTest {
             fakeAuthAdapter.createAccountResult = AuthResult.Failure(expectedError)
             val createCountBefore = fakeProfileApiService.createProfileCount
 
-            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
             assertEquals(expectedError, result)
             assertEquals(createCountBefore, fakeProfileApiService.createProfileCount)
@@ -835,7 +839,7 @@ class ApiAccountRepositoryTest {
             )
         )
 
-        val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.RejectedAuthentication, result)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
@@ -857,7 +861,7 @@ class ApiAccountRepositoryTest {
             val postCountBefore = fakeProfileApiService.createProfileCount
             val signOutBefore = fakeAuthAdapter.signOutCount
 
-            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
             assertEquals("Status $statusCode should map to RejectedAuthentication", SignInResult.RejectedAuthentication, result)
             assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
@@ -870,14 +874,15 @@ class ApiAccountRepositoryTest {
     }
 
     @Test
-    fun `register maps POST 422 with verified display_name field identifier to InvalidDisplayName without replay`() = runTest {
-        val verifiedBodies = listOf(
-            """{"detail":[{"loc":["body","display_name"],"msg":"Field required","type":"missing"}]}""",
-            """{"errors":{"display_name":["Display name must not be blank"]}}""",
-            """{"field":"displayName","message":"Invalid display name"}""",
+    fun `register maps POST 422 with verified first_name, last_name, phone_number, or display_name field identifiers without replay`() = runTest {
+        val verifiedCases = listOf(
+            """{"detail":[{"loc":["body","first_name"],"msg":"Field required","type":"missing"}]}""" to SignInResult.InvalidFirstName,
+            """{"detail":[{"loc":["body","last_name"],"msg":"Field required","type":"missing"}]}""" to SignInResult.InvalidLastName,
+            """{"detail":[{"loc":["body","phone_number"],"msg":"String too long","type":"string_too_long"}]}""" to SignInResult.InvalidPhoneNumber,
+            """{"detail":[{"loc":["body","display_name"],"msg":"Field required","type":"missing"}]}""" to SignInResult.InvalidDisplayName,
         )
 
-        for (body in verifiedBodies) {
+        for ((body, expectedResult) in verifiedCases) {
             fakeAuthAdapter.createAccountResult = AuthResult.Success(
                 TestAuthUser(uid = "candidate-uid-422", email = "borrower@example.com")
             )
@@ -887,9 +892,9 @@ class ApiAccountRepositoryTest {
             val postCountBefore = fakeProfileApiService.createProfileCount
             val signOutBefore = fakeAuthAdapter.signOutCount
 
-            val result = repository.register("borrower@example.com", "StrongPass123!", "   ")
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
-            assertEquals("Body $body should map to InvalidDisplayName", SignInResult.InvalidDisplayName, result)
+            assertEquals("Body $body should map to $expectedResult", expectedResult, result)
             assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
             assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
             assertEquals(null, fakeAuthAdapter.currentUid)
@@ -900,7 +905,7 @@ class ApiAccountRepositoryTest {
     @Test
     fun `register maps POST 422 with unknown field or malformed error body to GenericFailure`() = runTest {
         val unverifiedBodies = listOf(
-            """{"detail":[{"loc":["body","phone_number"],"msg":"Invalid phone"}]}""",
+            """{"detail":[{"loc":["body","unknown_field"],"msg":"Invalid field"}]}""",
             """{"detail":"Unprocessable entity"}""",
             """not valid json at all""",
             """""",
@@ -916,7 +921,7 @@ class ApiAccountRepositoryTest {
             val postCountBefore = fakeProfileApiService.createProfileCount
             val signOutBefore = fakeAuthAdapter.signOutCount
 
-            val result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+            val result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
             assertEquals("Body '$body' should map to GenericFailure", SignInResult.GenericFailure, result)
             assertEquals(postCountBefore + 1, fakeProfileApiService.createProfileCount)
@@ -936,7 +941,7 @@ class ApiAccountRepositoryTest {
             Response.error<UserProfileDto>(409, """{"detail":"Profile already exists"}""".toResponseBody(null))
         )
 
-        val conflictResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val conflictResult = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.CompletionNeeded, conflictResult)
         assertEquals(1, fakeProfileApiService.createProfileCount)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -950,7 +955,7 @@ class ApiAccountRepositoryTest {
             Response.error<UserProfileDto>(503, """{"detail":"Service unavailable"}""".toResponseBody(null))
         )
 
-        val serverErrorResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val serverErrorResult = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.CompletionNeeded, serverErrorResult)
         assertEquals(2, fakeProfileApiService.createProfileCount)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -962,7 +967,7 @@ class ApiAccountRepositoryTest {
         )
         fakeProfileApiService.exceptionToThrow = IOException("Connection reset during profile POST")
 
-        val ioResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val ioResult = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.CompletionNeeded, ioResult)
         assertEquals(3, fakeProfileApiService.createProfileCount)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -978,7 +983,7 @@ class ApiAccountRepositoryTest {
         fakeProfileApiService.exceptionToThrow = CancellationException("Registration cancelled")
 
         try {
-            repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+            repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
             fail("Expected CancellationException to be thrown")
         } catch (e: CancellationException) {
             assertEquals("Registration cancelled", e.message)
@@ -1014,7 +1019,7 @@ class ApiAccountRepositoryTest {
             updatedAt = "2026-11-19T12:00:00Z"
         )
 
-        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+        val result = repository.register(candidateEmail, "StrongPass123!", "Reconciled", "Borrower", "+1234567890")
 
         assertEquals(SignInResult.Success, result)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
@@ -1053,7 +1058,7 @@ class ApiAccountRepositoryTest {
             updatedAt = "2026-11-19T12:05:00Z"
         )
 
-        val result = repository.register(candidateEmail, "StrongPass123!", displayName)
+        val result = repository.register(candidateEmail, "StrongPass123!", "Timeout", "Borrower")
 
         assertEquals(SignInResult.Success, result)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
@@ -1085,7 +1090,7 @@ class ApiAccountRepositoryTest {
         )
         val signOutBefore409 = fakeAuthAdapter.signOutCount
 
-        val conflict404Result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val conflict404Result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.CompletionNeeded, conflict404Result)
         assertEquals(1, fakeProfileApiService.createProfileCount)
@@ -1106,7 +1111,7 @@ class ApiAccountRepositoryTest {
         )
         val signOutBeforeTimeout = fakeAuthAdapter.signOutCount
 
-        val timeout404Result = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val timeout404Result = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
 
         assertEquals(SignInResult.CompletionNeeded, timeout404Result)
         assertEquals(2, fakeProfileApiService.createProfileCount)
@@ -1136,7 +1141,7 @@ class ApiAccountRepositoryTest {
             displayName = "Test Borrower"
         )
 
-        val mismatchResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val mismatchResult = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.RejectedAuthentication, mismatchResult)
         assertEquals(1, fakeProfileApiService.createProfileCount)
         assertEquals(1, fakeProfileApiService.getProfileCount)
@@ -1155,7 +1160,7 @@ class ApiAccountRepositoryTest {
             displayName = "Test Borrower"
         )
 
-        val missingRoleResult = repository.register("borrower@example.com", "StrongPass123!", "Test Borrower")
+        val missingRoleResult = repository.register("borrower@example.com", "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.UnsupportedRole, missingRoleResult)
         assertEquals(2, fakeProfileApiService.createProfileCount)
         assertEquals(2, fakeProfileApiService.getProfileCount)
@@ -1174,7 +1179,7 @@ class ApiAccountRepositoryTest {
             displayName = "Unexpected Broker"
         )
 
-        val nonBorrowerResult = repository.register("borrower@example.com", "StrongPass123!", "Unexpected Broker")
+        val nonBorrowerResult = repository.register("borrower@example.com", "StrongPass123!", "Unexpected", "Broker")
         assertEquals(SignInResult.UnsupportedRole, nonBorrowerResult)
         assertEquals(3, fakeProfileApiService.createProfileCount)
         assertEquals(3, fakeProfileApiService.getProfileCount)
@@ -1206,7 +1211,7 @@ class ApiAccountRepositoryTest {
             displayName = "Stale Borrower"
         )
 
-        val staleGetResult = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+        val staleGetResult = repository.register("stale@example.com", "StrongPass123!", "Stale", "Borrower")
 
         assertEquals(SignInResult.GenericFailure, staleGetResult)
         assertEquals(1, fakeProfileApiService.createProfileCount)
@@ -1228,7 +1233,7 @@ class ApiAccountRepositoryTest {
             TestAuthUser(uid = staleUid, email = "stale@example.com")
         )
 
-        val stalePostResult = repository.register("stale@example.com", "StrongPass123!", "Stale Borrower")
+        val stalePostResult = repository.register("stale@example.com", "StrongPass123!", "Stale", "Borrower")
 
         assertEquals(SignInResult.GenericFailure, stalePostResult)
         assertEquals(2, fakeProfileApiService.createProfileCount)
@@ -1261,7 +1266,7 @@ class ApiAccountRepositoryTest {
             updatedAt = "2026-11-19T13:00:00Z"
         )
 
-        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Existing", "Borrower")
 
         assertEquals(SignInResult.Success, result)
         assertEquals(1, fakeAuthAdapter.signInCount)
@@ -1298,7 +1303,7 @@ class ApiAccountRepositoryTest {
         )
         val signOutBeforeBroker = fakeAuthAdapter.signOutCount
 
-        val brokerResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+        val brokerResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite", "Attempt")
 
         assertEquals(SignInResult.UnsupportedRole, brokerResult)
         assertEquals(1, fakeAuthAdapter.signInCount)
@@ -1322,7 +1327,7 @@ class ApiAccountRepositoryTest {
             displayName = "Existing Underwriter"
         )
 
-        val underwriterResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+        val underwriterResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite", "Attempt")
 
         assertEquals(SignInResult.UnsupportedRole, underwriterResult)
         assertEquals(2, fakeAuthAdapter.signInCount)
@@ -1342,7 +1347,7 @@ class ApiAccountRepositoryTest {
             displayName = "Missing Role User"
         )
 
-        val missingRoleResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+        val missingRoleResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite", "Attempt")
 
         assertEquals(SignInResult.UnsupportedRole, missingRoleResult)
         assertEquals(3, fakeAuthAdapter.signInCount)
@@ -1362,7 +1367,7 @@ class ApiAccountRepositoryTest {
             displayName = "Other Borrower"
         )
 
-        val mismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite Attempt")
+        val mismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Overwrite", "Attempt")
 
         assertEquals(SignInResult.RejectedAuthentication, mismatchResult)
         assertEquals(4, fakeAuthAdapter.signInCount)
@@ -1379,7 +1384,7 @@ class ApiAccountRepositoryTest {
 
         // 1. Auth signIn failure -> InvalidCredentials, 0 GETs, 0 POSTs
         fakeAuthAdapter.signInResult = AuthResult.Failure(SignInResult.InvalidCredentials)
-        val authFailResult = repository.completeRegistration(candidateEmail, "WrongPass", "Test Borrower")
+        val authFailResult = repository.completeRegistration(candidateEmail, "WrongPass", "Test", "Borrower")
         assertEquals(SignInResult.InvalidCredentials, authFailResult)
         assertEquals(1, fakeAuthAdapter.signInCount)
         assertEquals(0, fakeProfileApiService.getProfileCount)
@@ -1390,7 +1395,7 @@ class ApiAccountRepositoryTest {
         fakeAuthAdapter.signInResult = AuthResult.Success(
             TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.failure(IOException("Token error")))
         )
-        val tokenFailResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        val tokenFailResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.RejectedAuthentication, tokenFailResult)
         assertEquals(2, fakeAuthAdapter.signInCount)
         assertEquals(0, fakeProfileApiService.getProfileCount)
@@ -1404,7 +1409,7 @@ class ApiAccountRepositoryTest {
         fakeProfileApiService.getExceptionToThrow = HttpException(
             Response.error<UserProfileDto>(401, """{"detail":"Unauthorized"}""".toResponseBody(null))
         )
-        val http401Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        val http401Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.RejectedAuthentication, http401Result)
         assertEquals(1, fakeProfileApiService.getProfileCount)
         assertEquals(0, fakeProfileApiService.createProfileCount)
@@ -1418,7 +1423,7 @@ class ApiAccountRepositoryTest {
         fakeProfileApiService.getExceptionToThrow = HttpException(
             Response.error<UserProfileDto>(500, """{"detail":"Internal Server Error"}""".toResponseBody(null))
         )
-        val http500Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        val http500Result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.GenericFailure, http500Result)
         assertEquals(2, fakeProfileApiService.getProfileCount)
         assertEquals(0, fakeProfileApiService.createProfileCount)
@@ -1430,7 +1435,7 @@ class ApiAccountRepositoryTest {
             TestAuthUser(uid = candidateUid, email = candidateEmail)
         )
         fakeProfileApiService.getExceptionToThrow = IOException("Connection reset")
-        val ioResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test Borrower")
+        val ioResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test", "Borrower")
         assertEquals(SignInResult.Connectivity, ioResult)
         assertEquals(3, fakeProfileApiService.getProfileCount)
         assertEquals(0, fakeProfileApiService.createProfileCount)
@@ -1463,7 +1468,7 @@ class ApiAccountRepositoryTest {
             updatedAt = "2026-11-19T14:00:00Z"
         )
 
-        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+        val result = repository.completeRegistration(candidateEmail, "StrongPass123!", "Recovered", "Borrower", "+1234567890")
 
         assertEquals(SignInResult.Success, result)
         assertEquals(1, fakeAuthAdapter.signInCount)
@@ -1472,7 +1477,11 @@ class ApiAccountRepositoryTest {
         assertEquals(1, fakeProfileApiService.createProfileCount)
         assertEquals("Bearer $candidateToken", fakeProfileApiService.lastHeader)
         assertEquals(
-            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest.forBorrower(
+                firstName = "Recovered",
+                lastName = "Borrower",
+                phoneNumber = "+1234567890"
+            ),
             fakeProfileApiService.lastCreatedRequest
         )
         assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
@@ -1502,7 +1511,7 @@ class ApiAccountRepositoryTest {
             Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
         )
 
-        val interruptedResult = repository.register(candidateEmail, "StrongPass123!", displayName)
+        val interruptedResult = repository.register(candidateEmail, "StrongPass123!", "Borrower", "After Restart")
         assertEquals(SignInResult.CompletionNeeded, interruptedResult)
         assertEquals(1, fakeAuthAdapter.createAccountCount)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
@@ -1523,7 +1532,7 @@ class ApiAccountRepositoryTest {
         assertEquals(SignInResult.GenericFailure, restoreResult)
         assertTrue(postRestartSessionOwner.sessionState.value is SessionState.SignedOut)
 
-        // Step 3: User chooses explicit completion ("Finish registration") and submits credentials + displayName.
+        // Step 3: User chooses explicit completion ("Finish registration") and submits credentials + profile fields.
         // GET /users/me returns 404 (profile still missing), allowing one POST /users/me that succeeds with 201.
         fakeAuthAdapter.signInResult = AuthResult.Success(
             TestAuthUser(uid = candidateUid, email = candidateEmail, tokenResult = Result.success("fresh-signin-token"))
@@ -1545,7 +1554,12 @@ class ApiAccountRepositoryTest {
         val getCountBeforeCompletion = fakeProfileApiService.getProfileCount
         val postCountBeforeCompletion = fakeProfileApiService.createProfileCount
 
-        val completionResult = postRestartRepository.completeRegistration(candidateEmail, "StrongPass123!", displayName)
+        val completionResult = postRestartRepository.completeRegistration(
+            candidateEmail,
+            "StrongPass123!",
+            "Borrower",
+            "After Restart"
+        )
 
         assertEquals(SignInResult.Success, completionResult)
         assertEquals(createAccountCountBeforeCompletion, fakeAuthAdapter.createAccountCount)
@@ -1553,7 +1567,10 @@ class ApiAccountRepositoryTest {
         assertEquals(getCountBeforeCompletion + 1, fakeProfileApiService.getProfileCount)
         assertEquals(postCountBeforeCompletion + 1, fakeProfileApiService.createProfileCount)
         assertEquals(
-            com.mortgee.al_mobile.data.network.model.CreateProfileRequest(displayName = displayName),
+            com.mortgee.al_mobile.data.network.model.CreateProfileRequest.forBorrower(
+                firstName = "Borrower",
+                lastName = "After Restart"
+            ),
             fakeProfileApiService.lastCreatedRequest
         )
         assertEquals(listOf(candidateUid), fakePartitionManager.preparedUids)
@@ -1575,25 +1592,38 @@ class ApiAccountRepositoryTest {
         fakeAuthAdapter.signInResult = AuthResult.Success(
             TestAuthUser(uid = candidateUid, email = candidateEmail)
         )
-        fakeProfileApiService.getExceptionToThrow = HttpException(
-            Response.error<UserProfileDto>(404, """{"detail":"Not found"}""".toResponseBody(null))
-        )
+        val newMissingProfile404 = {
+            HttpException(
+                Response.error<UserProfileDto>(404, """{"detail":"User profile not found"}""".toResponseBody(null))
+            )
+        }
 
-        // 1. POST 422 with verified display_name field -> InvalidDisplayName, 1 GET, 1 POST
+        // 1. Local validation rejects blank firstName before POST on confirmed 404
+        fakeProfileApiService.getExceptionToThrow = newMissingProfile404()
+        val invalidLocalNameResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "   ", "Borrower")
+        assertEquals(SignInResult.InvalidFirstName, invalidLocalNameResult)
+        assertEquals(1, fakeProfileApiService.getProfileCount)
+        assertEquals(0, fakeProfileApiService.createProfileCount)
+        assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
+        assertEquals(null, fakeAuthAdapter.currentUid)
+
+        // 2. POST 422 with verified first_name field -> InvalidFirstName, 2 GETs, 1 POST
+        fakeProfileApiService.getExceptionToThrow = newMissingProfile404()
         fakeProfileApiService.createExceptionToThrow = HttpException(
             Response.error<UserProfileDto>(
                 422,
-                """{"detail":[{"loc":["body","display_name"],"msg":"String should have at least 1 character"}]}""".toResponseBody(null)
+                """{"detail":[{"loc":["body","first_name"],"msg":"String should have at least 1 character"}]}""".toResponseBody(null)
             )
         )
-        val invalidNameResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "   ")
-        assertEquals(SignInResult.InvalidDisplayName, invalidNameResult)
-        assertEquals(1, fakeProfileApiService.getProfileCount)
+        val invalidServerNameResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Test", "Borrower")
+        assertEquals(SignInResult.InvalidFirstName, invalidServerNameResult)
+        assertEquals(2, fakeProfileApiService.getProfileCount)
         assertEquals(1, fakeProfileApiService.createProfileCount)
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)
         assertEquals(null, fakeAuthAdapter.currentUid)
 
-        // 2. POST returns mismatched role -> UnsupportedRole, 2 GETs, 2 POSTs
+        // 3. POST returns mismatched role -> UnsupportedRole, 3 GETs, 2 POSTs
+        fakeProfileApiService.getExceptionToThrow = newMissingProfile404()
         fakeProfileApiService.createExceptionToThrow = null
         fakeProfileApiService.profileResult = UserProfileDto(
             uid = candidateUid,
@@ -1601,9 +1631,9 @@ class ApiAccountRepositoryTest {
             role = "broker",
             displayName = "Unexpected Broker"
         )
-        val roleMismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Unexpected Broker")
+        val roleMismatchResult = repository.completeRegistration(candidateEmail, "StrongPass123!", "Unexpected", "Broker")
         assertEquals(SignInResult.UnsupportedRole, roleMismatchResult)
-        assertEquals(2, fakeProfileApiService.getProfileCount)
+        assertEquals(3, fakeProfileApiService.getProfileCount)
         assertEquals(2, fakeProfileApiService.createProfileCount)
         assertTrue(fakePartitionManager.preparedUids.isEmpty())
         assertTrue(sessionOwner.sessionState.value is SessionState.SignedOut)

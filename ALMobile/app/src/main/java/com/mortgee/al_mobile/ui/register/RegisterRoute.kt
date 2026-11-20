@@ -50,7 +50,9 @@ fun RegisterRoute(
 
     RegisterScreen(
         formState = formState,
-        onDisplayNameChange = viewModel::onDisplayNameChanged,
+        onFirstNameChange = viewModel::onFirstNameChanged,
+        onLastNameChange = viewModel::onLastNameChanged,
+        onPhoneNumberChange = viewModel::onPhoneNumberChanged,
         onEmailChange = viewModel::onEmailChanged,
         onPasswordChange = viewModel::onPasswordChanged,
         onSubmit = viewModel::submit,

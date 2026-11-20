@@ -190,13 +190,17 @@ class SignInViewModelTest {
         override suspend fun register(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult = resultToReturn
 
         override suspend fun completeRegistration(
             email: String,
             password: String,
-            displayName: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
         ): SignInResult = resultToReturn
     }
 }

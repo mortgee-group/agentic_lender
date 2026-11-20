@@ -123,7 +123,15 @@ Existing test files to be extended for Task 04 implementation:
 
 ---
 
-## 6. Verification Status
+## 6. Verification Status (Task 04.16)
 
-- Automated Unit Test Command: `./gradlew testDebugUnitTest` → **PASS** (255 tests passed, 0 failures)
+- Automated Unit & Transport Tests: `./gradlew testDebugUnitTest --rerun-tasks` → **PASS** (`255 passed, 0 skipped, 0 failed`)
 - Build Verification Command: `./gradlew assembleDebug` → **PASS**
+- Compose UI Preview Verification: `RegisterScreenCreatePreview` → **PASS**
+- Connected Device Verification (`d20023e1`):
+  - Deployment (`com.mortgee.al_mobile.dev`), Sign-Out, **No Account? Register** (`04.15A`), Back navigation, **Already have an account? Sign in** round-trips (`04.15B`), local field validation, mode toggles, and portrait/landscape rotation state retention (`04.14`): **PASS**
+  - Live Smoke Test against `https://agentic-lender-525895646792.europe-west2.run.app`: **PASS** — Registered `task04_live_20261120@example.com` (`First Name: TaskFour`, `Last Name: Borrower`, `Phone Number: +353871234567`, `role: "borrower"`) on physical device `d20023e1`; Firebase account creation and live AL-Core `POST /users/me` (`201 Created`) succeeded, committing the session (`UID: dIQQNGCbFTT4NuKvPSEN7VU9mzQ2`) and navigating to **Authenticated Landing**.
+- Detailed Verification Report: [`docs/task-04-16-verification.md`](./task-04-16-verification.md)
+
+
+
