@@ -5,6 +5,9 @@ import type { PortalRole } from "../types/roles";
 export default function Login({onLogin}: {onLogin: (user: AuthUser) => void}) {
  const [mode,setMode]=useState<"login"|"register">("login");
  const [email,setEmail]=useState("");
+ const [firstName,setFirstName]=useState("");
+ const [lastName,setLastName]=useState("");
+ const [phoneNumber,setPhoneNumber]=useState("");
  const [password,setPassword]=useState("");
  const [confirmPassword,setConfirmPassword]=useState("");
  const [selectedRole,setSelectedRole]=useState<PortalRole>("borrower");
@@ -24,7 +27,7 @@ export default function Login({onLogin}: {onLogin: (user: AuthUser) => void}) {
   setLoading(true);
   try{
    const user=mode==="register"
-    ? await register(email.trim(),password,selectedRole)
+    ? await register(email.trim(),password,selectedRole,firstName,lastName,phoneNumber)
     : await login(email.trim(),password);
    onLogin(user);
   }catch(err){setError(err instanceof Error?err.message:"Unable to complete authentication");}
@@ -39,8 +42,13 @@ export default function Login({onLogin}: {onLogin: (user: AuthUser) => void}) {
    <button type="button" className={mode==="register"?"active":""} aria-pressed={mode==="register"} onClick={()=>switchMode("register")} disabled={loading}>Register</button>
   </div>
   <h1 id="login-title">{mode==="register"?"Create a test account":"Sign in"}</h1>
-  <p className="auth-description">{mode==="register"?"Register with Firebase and select a demo workspace for testing.":"Sign in to your mortgage application workspace."}</p>
+  <p className="auth-description">{mode==="register"?"Create a Firebase account and an AL-Core profile for development testing.":"Sign in to your mortgage application workspace."}</p>
   <form onSubmit={handleSubmit}>
+   {mode==="register"&&<>
+    <div className="field"><label htmlFor="auth-first-name">First name</label><input id="auth-first-name" name="firstName" autoComplete="given-name" value={firstName} onChange={e=>setFirstName(e.target.value)} maxLength={30} required disabled={loading}/></div>
+    <div className="field"><label htmlFor="auth-last-name">Last name</label><input id="auth-last-name" name="lastName" autoComplete="family-name" value={lastName} onChange={e=>setLastName(e.target.value)} maxLength={50} required disabled={loading}/></div>
+    <div className="field"><label htmlFor="auth-phone">Phone number</label><input id="auth-phone" name="phoneNumber" type="tel" autoComplete="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} maxLength={20} required disabled={loading}/></div>
+   </>}
    <div className="field"><label htmlFor="auth-email">Email address</label><input id="auth-email" name="email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required autoFocus/></div>
    <div className="field"><label htmlFor="auth-password">Password</label><input id="auth-password" name="password" type="password" autoComplete={mode==="register"?"new-password":"current-password"} minLength={mode==="register"?6:undefined} value={password} onChange={e=>setPassword(e.target.value)} required/></div>
    {mode==="register"&&<>
@@ -50,7 +58,7 @@ export default function Login({onLogin}: {onLogin: (user: AuthUser) => void}) {
       <option value="borrower">Borrower</option><option value="broker">Mortgage Broker</option><option value="underwriter">Underwriter</option>
      </select>
     </div>
-    <div className="notice auth-demo-notice"><strong>Development testing only.</strong> This selection changes the sample dashboard, not your verified permissions. The role is remembered on this browser only.</div>
+    <div className="notice auth-demo-notice"><strong>Development testing only.</strong> The selected role is sent to AL-Core when creating your Firestore profile. Privileged role selection must be restricted before production.</div>
    </>}
    {error&&<div className="auth-error" role="alert">{error}</div>}
    <button className="btn primary auth-submit" type="submit" disabled={loading}>{loading?(mode==="register"?"Creating account…":"Signing in…"):(mode==="register"?"Create test account":"Sign in")}</button>

@@ -7,6 +7,7 @@ import {
 } from "firebase/auth";
 import { getFirebaseAuth } from "../firebase/firebase";
 import type { PortalRole } from "../types/roles";
+import {createCoreProfile,getCoreProfile,ApiError} from "./api";
 
 /**
  * UI-only development role mapping. No real authorization is granted here.
@@ -62,15 +63,29 @@ function readableAuthError(error: unknown): Error {
  }
 }
 
-/** Authenticate with Firebase, then resolve the temporary demo dashboard. */
+/** Prefer the backend profile; retain the existing demo mapping for legacy accounts
+ * and the missing-profile recovery screen. Backend endpoints enforce permissions. */
+async function resolveUser(user: User | null): Promise<AuthUser | null> {
+ if (!user?.email) return null;
+ try {
+  const profile = await getCoreProfile();
+  if (profile.uid !== user.uid || !validRole(profile.role)) throw new Error("Invalid backend profile.");
+  return {uid:user.uid,email:user.email,role:profile.role,username:profile.display_name || demoAccounts[user.email.toLowerCase()]?.username || user.email};
+ } catch (error) {
+  if (error instanceof ApiError && error.status === 404) return mapFirebaseUser(user);
+  throw error;
+ }
+}
+
+/** Authenticate with Firebase, then resolve the AL-Core profile. */
 export async function login(email: string, password: string): Promise<AuthUser> {
  const auth = getFirebaseAuth();
  try {
   const result = await signInWithEmailAndPassword(auth, email.trim(), password);
-  const mapped = mapFirebaseUser(result.user);
+  const mapped = await resolveUser(result.user);
   if (!mapped) {
    await signOut(auth);
-   throw new Error("No local demo role is available for this account on this browser. Contact the project team.");
+   throw new Error("No backend profile or local recovery role is available for this account. Contact the project team.");
   }
   return mapped;
  } catch (error) {
@@ -78,39 +93,46 @@ export async function login(email: string, password: string): Promise<AuthUser> 
  }
 }
 
-/**
- * Create a Firebase user and remember their requested demo UI role locally.
- * The role is not saved as a trusted Firebase claim or Firestore permission.
+/** Create a Firebase identity, then create its persistent AL-Core profile.
+ * Role selection remains development-only until the backend restricts it.
  */
-export async function register(email: string, password: string, selectedRole: PortalRole): Promise<AuthUser> {
- if (!validRole(selectedRole)) throw new Error("Select a valid demo role.");
+export async function register(email: string, password: string, selectedRole: PortalRole, firstName: string, lastName: string, phoneNumber: string): Promise<AuthUser> {
+ if (!validRole(selectedRole)) throw new Error("Select a valid test role.");
+ if (!firstName.trim() || firstName.trim().length > 30 || !lastName.trim() || lastName.trim().length > 50)
+  throw new Error("Enter a first name (1–30 characters) and last name (1–50 characters).");
+ if (!phoneNumber.trim() || phoneNumber.trim().length > 20)
+  throw new Error("Enter a phone number of up to 20 characters.");
  const auth = getFirebaseAuth();
  let created: User;
  try {
-  const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  created = credential.user;
+  created = (await createUserWithEmailAndPassword(auth, email.trim(), password)).user;
  } catch (error) {
   throw readableAuthError(error);
  }
+ // Remember the test role only to support recovery of an incomplete signup.
+ try { window.localStorage.setItem(demoRoleKey(created.uid), selectedRole); } catch { /* backend profile is authoritative */ }
  try {
-  window.localStorage.setItem(demoRoleKey(created.uid), selectedRole);
- } catch {
+  const profile = await createCoreProfile(firstName,lastName,selectedRole,phoneNumber);
+  if (profile.uid !== created.uid || !validRole(profile.role)) throw new Error("Invalid backend profile.");
+  return {uid:created.uid,email:created.email ?? email.trim(),role:profile.role,username:profile.display_name || firstName.trim()};
+ } catch (error) {
+  // The POST might have succeeded before a network failure. Never delete the Firebase account.
+  // If a valid profile exists, use it instead of repeating profile creation.
+  try {
+   const profile = await getCoreProfile();
+   if (profile.uid === created.uid && validRole(profile.role))
+    return {uid:created.uid,email:created.email ?? email.trim(),role:profile.role,username:profile.display_name || firstName.trim()};
+  } catch { /* Preserve the original error for the user. */ }
   await signOut(auth);
-  throw new Error("The account was created in Firebase, but this browser could not save its demo role. Enable local storage and contact the project team before retrying.");
+  throw new Error("Firebase account created, but AL-Core profile creation could not be confirmed. Sign in with the same email and use AL-Core connection status to complete the profile if missing. " + (error instanceof Error ? error.message : ""));
  }
- const mapped = mapFirebaseUser(created);
- if (!mapped) {
-  await signOut(auth);
-  throw new Error("Account created, but the demo role could not be loaded.");
- }
- return mapped;
 }
 
 /** Wait for Firebase to restore its session after a browser refresh. */
 export async function getCurrentUser(): Promise<AuthUser | null> {
  const auth = getFirebaseAuth();
  await auth.authStateReady();
- return mapFirebaseUser(auth.currentUser);
+ return resolveUser(auth.currentUser);
 }
 
 export async function logout(): Promise<void> {
@@ -118,5 +140,5 @@ export async function logout(): Promise<void> {
 }
 
 export function observeCurrentUser(callback: (user: AuthUser | null) => void): () => void {
- return onAuthStateChanged(getFirebaseAuth(), user => callback(mapFirebaseUser(user)));
+ return onAuthStateChanged(getFirebaseAuth(), user => { void resolveUser(user).then(callback).catch(() => callback(null)); });
 }

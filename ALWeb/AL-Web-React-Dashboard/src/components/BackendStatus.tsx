@@ -14,6 +14,7 @@ export default function BackendStatus({user}:{user:AuthUser}) {
  const [notice,setNotice]=useState("");
  const [firstName,setFirstName]=useState("");
  const [lastName,setLastName]=useState("");
+ const [phoneNumber,setPhoneNumber]=useState("");
 
  const check=useCallback(async()=>{
   setHealth(pending);setIdentity(pending);setProfile(null);setProfileStep(pending);setRoleStep(pending);
@@ -50,7 +51,7 @@ export default function BackendStatus({user}:{user:AuthUser}) {
  async function provision(){
   setBusy(true);setNotice("");
   try{
-   await createCoreProfile(firstName,lastName,user.role);
+   await createCoreProfile(firstName,lastName,user.role,phoneNumber);
    await check();
    setNotice(`${user.role} profile created in Firestore.`);
   }catch(e){setNotice(e instanceof Error?e.message:"Profile creation failed");}
@@ -67,7 +68,7 @@ export default function BackendStatus({user}:{user:AuthUser}) {
   </div>
   <p className="core-note">Selected demo UI role: <strong>{user.role}</strong>.
    {profile?<> Verified AL-Core role: <strong>{profile.role}</strong>.</>:<> AL-Core permissions require a backend profile.</>}
-   {" "}All displayed loan files are still fictional Web data.</p>
+   {" "}Live application records are returned by AL-Core; AI Audit examples remain fictional.</p>
   {identity.state==="ok"&&profileStep.state==="missing"&&
    <form className="core-register" onSubmit={event=>{event.preventDefault();void provision();}}>
     <p>This account has no backend profile. Enter a fictional test name to create a persistent <strong>{user.role}</strong> profile in Firestore for development testing.</p>
@@ -78,10 +79,11 @@ export default function BackendStatus({user}:{user:AuthUser}) {
      <div className="field"><label htmlFor="core-last-name">Last name</label>
       <input id="core-last-name" type="text" value={lastName} onChange={e=>setLastName(e.target.value)}
        minLength={1} maxLength={50} required disabled={busy} autoComplete="family-name"/></div>
+     <div className="field"><label htmlFor="core-phone">Phone number</label><input id="core-phone" type="tel" autoComplete="tel" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)} maxLength={20} required disabled={busy}/></div>
     </div>
     {user.role!=="borrower"&&<p><strong>Development-only privileged role:</strong> AL-Core currently accepts this choice for testing. This capability must be restricted before production deployment.</p>}
     <p>Requested backend role: <strong>{user.role}</strong>. This creates a real Firestore document and cannot be repeated for the same account.</p>
-    <button type="submit" className="btn secondary" disabled={busy||!firstName.trim()||!lastName.trim()}>
+    <button type="submit" className="btn secondary" disabled={busy||!firstName.trim()||!lastName.trim()||!phoneNumber.trim()}>
      {busy?"Creating…":`Create ${user.role} profile`}
     </button>
    </form>}

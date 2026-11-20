@@ -92,7 +92,13 @@ def test_create_application():
         ),
     )
 
-    with patch("app.applications.db") as mock_db:
+    with (
+        patch("app.applications.db") as mock_db,
+        patch(
+            "app.applications.select_least_busy_broker",
+            return_value="broker-123",
+        ),
+    ):
         mock_document = mock_db.collection.return_value.document.return_value
         mock_document.id = "application-001"
 

@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import httpx
 import app.main as main_module
 from app.main import app
-from app.models import UserProfile, UserRole
+from app.models import UserProfile, UserRole, ApplicationStatus
 
 
 client = TestClient(app)
@@ -29,6 +29,7 @@ def test_underwrite_application_success(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
@@ -201,6 +202,7 @@ def test_underwrite_returns_503_when_ai_unavailable(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
@@ -276,6 +278,7 @@ def test_underwrite_returns_502_when_ai_returns_error(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
