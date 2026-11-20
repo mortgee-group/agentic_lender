@@ -159,3 +159,24 @@ def test_non_underwriter_cannot_approve_application(role):
 
     # Unauthorized users must never reach the decision logic.
     mock_save.assert_not_called()
+
+
+def test_unauthenticated_user_cannot_approve_application():
+    """Verify that requests without a Firebase token are rejected."""
+
+    with patch(
+        "app.main.save_underwriter_decision",
+    ) as mock_save:
+
+        response = client.patch(
+            ENDPOINT,
+            json={"decision": "APPROVED"},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == (
+        "Missing or invalid Authorization header"
+    )
+
+    mock_save.assert_not_called()
+    
