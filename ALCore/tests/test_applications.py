@@ -246,3 +246,41 @@ def test_reject_invalid_deposit(deposit):
                 ber_rating="B2",
             ),
         )
+
+
+def test_select_least_busy_broker_ignores_closed_applications():
+    from unittest.mock import MagicMock, patch
+    from app.applications import select_least_busy_broker
+
+    broker_a = MagicMock()
+    broker_a.id = "broker-a"
+
+    broker_b = MagicMock()
+    broker_b.id = "broker-b"
+
+    def mock_application(broker_id, lifecycle_status):
+        application = MagicMock()
+        application.to_dict.return_value = {
+            "brokerId": broker_id,
+            "lifecycleStatus": lifecycle_status,
+        }
+        return application
+
+    applications = [
+        mock_application("broker-a", "APPLIED"),
+        mock_application("broker-a", "CLOSED"),
+        mock_application("broker-a", "CLOSED"),
+        mock_application("broker-b", "APPLIED"),
+        mock_application("broker-b", "AI_DELIBERATED"),
+    ]
+
+    with patch("app.applications.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.stream.return_value = [
+            broker_a,
+            broker_b,
+        ]
+        mock_db.collection.return_value.stream.return_value = applications
+
+        selected_broker = select_least_busy_broker()
+
+    assert selected_broker == "broker-a"

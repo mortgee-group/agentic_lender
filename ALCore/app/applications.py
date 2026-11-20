@@ -223,7 +223,7 @@ def save_underwriter_decision(
     return update_decision(transaction)
 
 def select_least_busy_broker() -> str:
-    """Return the UID of the broker with the fewest assigned applications."""
+    """Return the UID of the broker with the fewest active applications."""
 
     brokers = list(
         db.collection("users")
@@ -232,13 +232,20 @@ def select_least_busy_broker() -> str:
     )
 
     if not brokers:
-        raise HTTPException(status_code=503, detail="No brokers are currently available")
+        raise HTTPException(
+            status_code=503,
+            detail="No brokers are currently available",
+        )
 
     counts = Counter()
 
     for application in db.collection("applications").stream():
-        broker_id = application.to_dict().get("brokerId")
-        if broker_id:
+        application_data = application.to_dict()
+
+        broker_id = application_data.get("brokerId")
+        lifecycle_status = application_data.get("lifecycleStatus")
+
+        if broker_id and lifecycle_status != "CLOSED":
             counts[broker_id] += 1
 
     return min(
