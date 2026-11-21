@@ -41,7 +41,7 @@ export default function AiActions({applicationId,lifecycleStatus,role,onUpdated,
   <h2>AI assessment and underwriting</h2>
   <p className="core-note">The assigned Broker triggers property valuation and affordability assessment. The Underwriter then triggers AI underwriting, reviews the recommendation and makes a separate human decision. Actions may save results to Firestore. Use fictional test records only.</p>
   {lifecycleStatus!=="APPLIED"&&<p className="core-note">Application status: <strong>{lifecycleStatus}</strong>. New assessment and underwriting runs are unavailable at this stage.</p>}
-  {canUnderwrite&&lifecycleStatus==="APPLIED"&&<p className="core-note">The Broker must complete the property assessment before underwriting. AL-Core will enforce this requirement once PR #27 is deployed.</p>}
+  {canUnderwrite&&lifecycleStatus==="APPLIED"&&<p className="core-note">A property valuation must be completed before AI underwriting. AL-Core enforces this prerequisite; if a valuation is missing the request will be rejected.</p>}
   <div className="live-detail-actions ai-action-buttons">
    {canAssess&&<button type="button" className="btn secondary" disabled={lifecycleStatus!=="APPLIED"||Boolean(working||pending)} onClick={()=>setPending("assess")}>
     {working==="assess"?"Assessing…":"Run property assessment"}</button>}
