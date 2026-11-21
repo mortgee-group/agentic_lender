@@ -143,6 +143,27 @@ def save_ai_decision(
     return decision_ref.id
 
 
+def get_ai_decision(application_id: str) -> dict | None:
+    """Retrieve the saved AI underwriting result for an application."""
+
+    # Find the AI decision associated with this application.
+    decision_docs = (
+        db.collection("aiDecisions")
+        .where(
+            filter=FieldFilter("applicationId", "==", application_id)
+        )
+        .limit(1)
+        .stream()
+    )
+
+    # Return the original AL-AI response, matching the POST endpoint.
+    for document in decision_docs:
+        return document.to_dict().get("aiResponse")
+
+    # No saved decision exists for this application.
+    return None
+
+
 def save_valuation(
     application_id: str,
     property_data: dict,
@@ -252,3 +273,17 @@ def select_least_busy_broker() -> str:
         (broker.id for broker in brokers),
         key=lambda uid: (counts[uid], uid),
     )
+
+
+def has_valuation(application_id: str) -> bool:
+    """Check whether an AI valuation exists for an application."""
+    valuation_docs = (
+        db.collection("valuations")
+        .where(
+            filter=FieldFilter("applicationId", "==", application_id)
+        )
+        .limit(1)
+        .stream()
+    )
+
+    return any(valuation_docs)
