@@ -6,7 +6,7 @@ import type {CoreApplication} from "../services/api";
 type DecisionFields={underwriterDecision?:"APPROVED"|"REJECTED"|null;decidedBy?:string|null;decidedAt?:string|null;DTI?:number|null};
 type ExportApplication=CoreApplication&DecisionFields;
 const empty=(v:unknown)=>v===null||v===undefined||v===""?"Not available":String(v);
-const money=(v:number|null|undefined)=>typeof v==="number"&&Number.isFinite(v)?new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:2}).format(v):"Not available";
+const money=(v:number|null|undefined)=>typeof v==="number"&&Number.isFinite(v)?"EUR "+new Intl.NumberFormat("en-IE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v):"Not available";
 const percent=(v:number|null|undefined)=>typeof v==="number"&&Number.isFinite(v)?v.toFixed(2)+"%":"Not available";
 const date=(v:string|null|undefined)=>v?new Date(v).toLocaleString("en-IE"):"Not available";
 const decision=(a:ExportApplication)=>a.underwriterDecision??"Not recorded (not an approval)";

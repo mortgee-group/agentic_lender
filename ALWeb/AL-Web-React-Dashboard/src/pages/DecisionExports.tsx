@@ -39,7 +39,7 @@ export default function DecisionExports(){
    const item=await getCoreApplication(selected);
    if(item.applicationId!==selected)throw new Error("AL-Core returned a different application.");
    const bytes=makeReportPdf(item);
-   downloadBrowserFile(bytes as Uint8Array<ArrayBuffer>,"application/pdf",`agentic-lender-${safeFilename(selected)}.pdf`);
+   downloadBrowserFile(new Uint8Array(bytes).buffer,"application/pdf",`agentic-lender-${safeFilename(selected)}.pdf`);
   }catch(e){setActionError(e instanceof Error?e.message:"Unable to generate PDF.");}
   finally{setBusy(false);}
  };
