@@ -1,12 +1,15 @@
 package com.mortgee.al_mobile.data.auth
 
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.auth.AuthResult as FirebaseSdkAuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
+import com.google.android.gms.tasks.Task
 import com.mortgee.al_mobile.data.model.SignInResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -32,8 +35,23 @@ class FirebaseAuthAdapter(
     private val mutationMutex = Mutex()
 
     override suspend fun signIn(email: String, password: String): AuthResult {
+        return executeAuthTask(forCreate = false) {
+            firebaseAuth.signInWithEmailAndPassword(email, password)
+        }
+    }
+
+    override suspend fun createAccount(email: String, password: String): AuthResult {
+        return executeAuthTask(forCreate = true) {
+            firebaseAuth.createUserWithEmailAndPassword(email, password)
+        }
+    }
+
+    private suspend fun executeAuthTask(
+        forCreate: Boolean,
+        taskBlock: () -> Task<FirebaseSdkAuthResult>
+    ): AuthResult {
         return mutationMutex.withLock {
-            val task = firebaseAuth.signInWithEmailAndPassword(email, password)
+            val task = taskBlock()
             var sdkUser: FirebaseUser? = null
             var sdkException: Exception? = null
 
@@ -54,7 +72,12 @@ class FirebaseAuthAdapter(
             }
 
             if (sdkException != null) {
-                return@withLock AuthResult.Failure(mapFirebaseException(sdkException))
+                val mappedError = if (forCreate) {
+                    mapCreateAccountException(sdkException)
+                } else {
+                    mapFirebaseException(sdkException)
+                }
+                return@withLock AuthResult.Failure(mappedError)
             }
 
             val user = sdkUser
@@ -109,6 +132,9 @@ class FirebaseAuthAdapter(
 
     companion object {
         fun mapFirebaseException(e: Exception): SignInResult {
+            if (e is FirebaseAuthWeakPasswordException) {
+                return SignInResult.WeakPassword
+            }
             if (e is FirebaseAuthInvalidCredentialsException || e is FirebaseAuthInvalidUserException) {
                 return SignInResult.InvalidCredentials
             }
@@ -122,6 +148,12 @@ class FirebaseAuthAdapter(
                 val errorCode = e.errorCode.uppercase()
                 if (errorCode.contains("USER_DISABLED")) {
                     return SignInResult.DisabledAccount
+                }
+                if (errorCode.contains("WEAK_PASSWORD")) {
+                    return SignInResult.WeakPassword
+                }
+                if (errorCode.contains("EMAIL_ALREADY_IN_USE")) {
+                    return SignInResult.AccountExists
                 }
                 if (errorCode.contains("USER_NOT_FOUND") ||
                     errorCode.contains("WRONG_PASSWORD") ||
@@ -140,10 +172,63 @@ class FirebaseAuthAdapter(
                     SignInResult.Connectivity
                 message.contains("disabled") || message.contains("user_disabled") ->
                     SignInResult.DisabledAccount
+                message.contains("weak_password") || message.contains("weak password") ->
+                    SignInResult.WeakPassword
+                message.contains("email_already_in_use") || message.contains("already in use") ->
+                    SignInResult.AccountExists
                 message.contains("invalid credential") || message.contains("wrong password") || message.contains("user not found") ->
                     SignInResult.InvalidCredentials
                 else ->
                     SignInResult.GenericFailure
+            }
+        }
+
+        fun mapCreateAccountException(e: Exception): SignInResult {
+            if (e is FirebaseAuthWeakPasswordException) {
+                return SignInResult.WeakPassword
+            }
+            if (e is FirebaseAuthUserCollisionException) {
+                return SignInResult.AccountExists
+            }
+            if (e is FirebaseAuthInvalidCredentialsException) {
+                val errorCode = e.errorCode.uppercase()
+                return if (errorCode.contains("WEAK_PASSWORD")) {
+                    SignInResult.WeakPassword
+                } else {
+                    SignInResult.InvalidEmail
+                }
+            }
+            if (e is FirebaseNetworkException) {
+                return SignInResult.Connectivity
+            }
+            if (e is FirebaseAuthException) {
+                val errorCode = e.errorCode.uppercase()
+                if (errorCode.contains("EMAIL_ALREADY_IN_USE") || errorCode.contains("COLLISION")) {
+                    return SignInResult.AccountExists
+                }
+                if (errorCode.contains("WEAK_PASSWORD")) {
+                    return SignInResult.WeakPassword
+                }
+                if (errorCode.contains("INVALID_EMAIL")) {
+                    return SignInResult.InvalidEmail
+                }
+                if (errorCode.contains("USER_DISABLED")) {
+                    return SignInResult.DisabledAccount
+                }
+                if (errorCode.contains("NETWORK") || errorCode.contains("CONNECTION")) {
+                    return SignInResult.Connectivity
+                }
+            }
+            val message = e.message?.lowercase() ?: ""
+            return when {
+                message.contains("email_already_in_use") || message.contains("already in use") || message.contains("collision") ->
+                    SignInResult.AccountExists
+                message.contains("weak_password") || message.contains("weak password") ->
+                    SignInResult.WeakPassword
+                message.contains("invalid_email") || message.contains("invalid email") || message.contains("badly formatted") ->
+                    SignInResult.InvalidEmail
+                else ->
+                    mapFirebaseException(e)
             }
         }
     }

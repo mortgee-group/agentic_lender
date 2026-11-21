@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import httpx
 import app.main as main_module
 from app.main import app
-from app.models import UserProfile, UserRole
+from app.models import UserProfile, UserRole, ApplicationStatus
 
 
 client = TestClient(app)
@@ -29,6 +29,7 @@ def test_underwrite_application_success(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
@@ -55,6 +56,12 @@ def test_underwrite_application_success(monkeypatch):
         main_module,
         "get_application",
         lambda application_id: MockApplication(),
+    )
+    # Simulate an existing valuation in Firestore.
+    monkeypatch.setattr(
+        main_module,
+        "has_valuation",
+        lambda application_id: True,
     )
 
     # Mock the response from AL-AI.
@@ -201,6 +208,7 @@ def test_underwrite_returns_503_when_ai_unavailable(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
@@ -227,6 +235,12 @@ def test_underwrite_returns_503_when_ai_unavailable(monkeypatch):
         main_module,
         "get_application",
         lambda application_id: MockApplication(),
+    )
+    # Simulate an existing valuation in Firestore.
+    monkeypatch.setattr(
+        main_module,
+        "has_valuation",
+        lambda application_id: True,
     )
 
     # Simulate AL-AI being unavailable.
@@ -276,6 +290,7 @@ def test_underwrite_returns_502_when_ai_returns_error(monkeypatch):
     class MockApplication:
         sellerAskingPrice = 350000
         deposit = 70000
+        lifecycleStatus = ApplicationStatus.APPLIED
 
         def model_dump(self, **kwargs):
             return {
@@ -302,6 +317,12 @@ def test_underwrite_returns_502_when_ai_returns_error(monkeypatch):
         main_module,
         "get_application",
         lambda application_id: MockApplication(),
+    )
+    # Simulate an existing valuation in Firestore.
+    monkeypatch.setattr(
+        main_module,
+        "has_valuation",
+        lambda application_id: True,
     )
 
     mock_underwrite = AsyncMock(
@@ -332,6 +353,69 @@ def test_underwrite_returns_502_when_ai_returns_error(monkeypatch):
         )
 
         mock_underwrite.assert_awaited_once()
+        mock_save_decision.assert_not_called()
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_underwrite_requires_valuation(monkeypatch):
+    # Simulate an authenticated underwriter.
+    route = next(
+        r for r in app.routes
+        if r.path == "/applications/{application_id}/underwrite"
+    )
+    role_dependency = route.dependant.dependencies[0].call
+
+    app.dependency_overrides[role_dependency] = lambda: UserProfile(
+        uid="underwriter-123",
+        email="underwriter@example.com",
+        role=UserRole.UNDERWRITER,
+        display_name="Test Underwriter",
+    )
+
+    class MockApplication:
+        lifecycleStatus = ApplicationStatus.APPLIED
+
+    monkeypatch.setattr(
+        main_module,
+        "get_application",
+        lambda application_id: MockApplication(),
+    )
+
+    # No valuation exists for this application.
+    mock_has_valuation = Mock(return_value=False)
+
+    monkeypatch.setattr(
+        main_module,
+        "has_valuation",
+        mock_has_valuation,
+    )
+
+    mock_underwrite = AsyncMock()
+    monkeypatch.setattr(
+        main_module,
+        "underwrite_application",
+        mock_underwrite,
+    )
+
+    mock_save_decision = Mock()
+    monkeypatch.setattr(
+        main_module,
+        "save_ai_decision",
+        mock_save_decision,
+    )
+
+    try:
+        response = client.post("/applications/APP-001/underwrite")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "AI assessment must be completed before underwriting"
+        )
+
+        mock_has_valuation.assert_called_once_with("APP-001")
+        mock_underwrite.assert_not_awaited()
         mock_save_decision.assert_not_called()
 
     finally:

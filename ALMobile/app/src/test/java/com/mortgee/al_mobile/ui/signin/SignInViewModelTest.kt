@@ -186,5 +186,21 @@ class SignInViewModelTest {
         }
 
         override suspend fun restoreSession(): SignInResult = resultToReturn
+
+        override suspend fun register(
+            email: String,
+            password: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
+        ): SignInResult = resultToReturn
+
+        override suspend fun completeRegistration(
+            email: String,
+            password: String,
+            firstName: String,
+            lastName: String,
+            phoneNumber: String?,
+        ): SignInResult = resultToReturn
     }
 }

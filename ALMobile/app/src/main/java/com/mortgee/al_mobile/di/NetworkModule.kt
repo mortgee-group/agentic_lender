@@ -58,6 +58,7 @@ object NetworkModule {
         privateRequestInterceptor: PrivateRequestInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            .retryOnConnectionFailure(false)
             .addInterceptor(privateRequestInterceptor)
             .addNetworkInterceptor(privateRequestInterceptor)
             .build()

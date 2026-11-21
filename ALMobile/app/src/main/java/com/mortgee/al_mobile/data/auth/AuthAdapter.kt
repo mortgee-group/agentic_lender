@@ -25,6 +25,16 @@ interface AuthAdapter {
     suspend fun signIn(email: String, password: String): AuthResult
 
     /**
+     * Creates a new account with email and password credentials using the Firebase Authentication SDK.
+     *
+     * @param email Candidate user email credential.
+     * @param password Candidate user password credential.
+     * @return [AuthResult] containing candidate [AuthUser] on success or safe [SignInResult] on error.
+     * @throws kotlinx.coroutines.CancellationException if cancelled.
+     */
+    suspend fun createAccount(email: String, password: String): AuthResult
+
+    /**
      * Obtains an ID token for the specified candidate UID.
      *
      * @param uid The expected candidate user ID.

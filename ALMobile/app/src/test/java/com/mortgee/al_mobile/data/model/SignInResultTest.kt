@@ -18,6 +18,14 @@ class SignInResultTest {
         assertFalse(SignInResult.MissingProfile.isSuccess)
         assertFalse(SignInResult.UnsupportedRole.isSuccess)
         assertFalse(SignInResult.GenericFailure.isSuccess)
+        assertFalse(SignInResult.InvalidEmail.isSuccess)
+        assertFalse(SignInResult.WeakPassword.isSuccess)
+        assertFalse(SignInResult.InvalidFirstName.isSuccess)
+        assertFalse(SignInResult.InvalidLastName.isSuccess)
+        assertFalse(SignInResult.InvalidPhoneNumber.isSuccess)
+        assertFalse(SignInResult.InvalidDisplayName.isSuccess)
+        assertFalse(SignInResult.AccountExists.isSuccess)
+        assertFalse(SignInResult.CompletionNeeded.isSuccess)
     }
 
     @Test
@@ -32,6 +40,14 @@ class SignInResultTest {
             SignInResult.MissingProfile,
             SignInResult.UnsupportedRole,
             SignInResult.GenericFailure,
+            SignInResult.InvalidEmail,
+            SignInResult.WeakPassword,
+            SignInResult.InvalidFirstName,
+            SignInResult.InvalidLastName,
+            SignInResult.InvalidPhoneNumber,
+            SignInResult.InvalidDisplayName,
+            SignInResult.AccountExists,
+            SignInResult.CompletionNeeded,
         )
 
         val mappedNames = outcomes.map { result ->
@@ -45,10 +61,18 @@ class SignInResultTest {
                 SignInResult.MissingProfile -> "MissingProfile"
                 SignInResult.UnsupportedRole -> "UnsupportedRole"
                 SignInResult.GenericFailure -> "GenericFailure"
+                SignInResult.InvalidEmail -> "InvalidEmail"
+                SignInResult.WeakPassword -> "WeakPassword"
+                SignInResult.InvalidFirstName -> "InvalidFirstName"
+                SignInResult.InvalidLastName -> "InvalidLastName"
+                SignInResult.InvalidPhoneNumber -> "InvalidPhoneNumber"
+                SignInResult.InvalidDisplayName -> "InvalidDisplayName"
+                SignInResult.AccountExists -> "AccountExists"
+                SignInResult.CompletionNeeded -> "CompletionNeeded"
             }
         }
 
-        assertEquals(9, mappedNames.size)
+        assertEquals(17, mappedNames.size)
         assertEquals(
             listOf(
                 "Success",
@@ -60,6 +84,14 @@ class SignInResultTest {
                 "MissingProfile",
                 "UnsupportedRole",
                 "GenericFailure",
+                "InvalidEmail",
+                "WeakPassword",
+                "InvalidFirstName",
+                "InvalidLastName",
+                "InvalidPhoneNumber",
+                "InvalidDisplayName",
+                "AccountExists",
+                "CompletionNeeded",
             ),
             mappedNames
         )

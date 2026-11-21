@@ -26,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -53,7 +54,9 @@ import com.mortgee.al_mobile.ui.theme.ALMobileTheme
  *
  * Renders controlled inputs for user email and password using Compose and Material 3 theme conventions.
  * Masks the password by default, disables form editing and submission during a sign-in attempt,
- * and routes both button click and keyboard IME submit actions through [onSubmit].
+ * routes both button click and keyboard IME submit actions through [onSubmit], and provides
+ * guest links to Borrower registration ([onNavigateToRegister]) and explicit registration
+ * completion ([onNavigateToFinishRegistration]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +66,8 @@ fun SignInScreen(
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
+    onNavigateToRegister: (() -> Unit)? = null,
+    onNavigateToFinishRegistration: (() -> Unit)? = null,
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
 
@@ -182,21 +187,46 @@ fun SignInScreen(
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier.padding(12.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = "Error Icon",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = formatErrorMessage(errorResult),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Error Icon",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = formatErrorMessage(errorResult),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+
+                                val showFinishRegistrationLink =
+                                    onNavigateToFinishRegistration != null && (
+                                        errorResult == SignInResult.MissingProfile ||
+                                            errorResult == SignInResult.CompletionNeeded
+                                        )
+
+                                if (showFinishRegistrationLink) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = onNavigateToFinishRegistration,
+                                            enabled = !formState.isSubmitting
+                                        ) {
+                                            Text("Finish registration")
+                                        }
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -227,19 +257,48 @@ fun SignInScreen(
                             Text("Sign In")
                         }
                     }
+
+                    if (onNavigateToRegister != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(
+                            onClick = onNavigateToRegister,
+                            enabled = !formState.isSubmitting
+                        ) {
+                            Text(NO_ACCOUNT_REGISTER_LABEL)
+                        }
+                    }
+
+                    if (onNavigateToFinishRegistration != null) {
+                        TextButton(
+                            onClick = onNavigateToFinishRegistration,
+                            enabled = !formState.isSubmitting
+                        ) {
+                            Text("Finish registration for an existing account")
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-private fun formatErrorMessage(result: SignInResult): String {
+internal const val NO_ACCOUNT_REGISTER_LABEL = "No Account? Register"
+
+internal fun formatErrorMessage(result: SignInResult): String {
     return when (result) {
         SignInResult.InvalidCredentials -> "Invalid email or password. Please try again."
+        SignInResult.InvalidEmail -> "Please enter a valid email address."
+        SignInResult.WeakPassword -> "Password does not meet security requirements."
+        SignInResult.InvalidFirstName -> "Please enter a valid first name."
+        SignInResult.InvalidLastName -> "Please enter a valid last name."
+        SignInResult.InvalidPhoneNumber -> "Please enter a valid phone number."
+        SignInResult.InvalidDisplayName -> "Please enter a valid display name."
+        SignInResult.AccountExists -> "An account with this email already exists."
+        SignInResult.CompletionNeeded -> "Account created, but profile setup needs completion. Choose Finish registration."
         SignInResult.DisabledAccount -> "This account has been disabled. Please contact support."
         SignInResult.Connectivity -> "Network connection error. Please check your connection."
         SignInResult.RejectedAuthentication -> "Authentication failed. Please verify your credentials."
-        SignInResult.MissingProfile -> "User profile not found."
+        SignInResult.MissingProfile -> "User profile not found. Choose Finish registration to complete setup."
         SignInResult.UnsupportedRole -> "Your account role is not supported."
         SignInResult.Busy -> "A sign-in operation is already in progress."
         SignInResult.Success -> ""
@@ -258,7 +317,8 @@ fun SignInScreenPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }
@@ -275,7 +335,8 @@ fun SignInScreenSubmittingPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }
@@ -292,7 +353,8 @@ fun SignInScreenErrorPreview() {
             ),
             onEmailChange = {},
             onPasswordChange = {},
-            onSubmit = {}
+            onSubmit = {},
+            onNavigateToRegister = {},
         )
     }
 }

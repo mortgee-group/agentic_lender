@@ -9,7 +9,7 @@ import org.junit.Test
 class AccountRepositoryTest {
 
     @Test
-    fun `account repository contract returns expected sign in results`() = runTest {
+    fun `account repository contract returns expected sign in and register results`() = runTest {
         val fakeRepository = object : AccountRepository {
             override suspend fun signIn(email: String, password: String): SignInResult {
                 return if (email == "valid@example.com" && password == "secret") {
@@ -20,6 +20,34 @@ class AccountRepositoryTest {
             }
 
             override suspend fun restoreSession(): SignInResult = SignInResult.Success
+
+            override suspend fun register(
+                email: String,
+                password: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
+            ): SignInResult {
+                return if (email.isNotBlank() && password.isNotBlank() && firstName.isNotBlank() && lastName.isNotBlank()) {
+                    SignInResult.Success
+                } else {
+                    SignInResult.InvalidFirstName
+                }
+            }
+
+            override suspend fun completeRegistration(
+                email: String,
+                password: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
+            ): SignInResult {
+                return if (email.isNotBlank() && password.isNotBlank() && firstName.isNotBlank() && lastName.isNotBlank()) {
+                    SignInResult.Success
+                } else {
+                    SignInResult.InvalidCredentials
+                }
+            }
         }
 
         assertEquals(
@@ -29,6 +57,14 @@ class AccountRepositoryTest {
         assertEquals(
             SignInResult.InvalidCredentials,
             fakeRepository.signIn("invalid@example.com", "wrong")
+        )
+        assertEquals(
+            SignInResult.Success,
+            fakeRepository.register("borrower@example.com", "secret123", "Test", "Borrower", "+353871234567")
+        )
+        assertEquals(
+            SignInResult.Success,
+            fakeRepository.completeRegistration("borrower@example.com", "secret123", "Test", "Borrower", null)
         )
     }
 
@@ -40,6 +76,22 @@ class AccountRepositoryTest {
             }
 
             override suspend fun restoreSession(): SignInResult = SignInResult.Success
+
+            override suspend fun register(
+                email: String,
+                password: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
+            ): SignInResult = SignInResult.Success
+
+            override suspend fun completeRegistration(
+                email: String,
+                password: String,
+                firstName: String,
+                lastName: String,
+                phoneNumber: String?,
+            ): SignInResult = SignInResult.Success
         }
 
         fakeRepository.signIn("test@example.com", "password")

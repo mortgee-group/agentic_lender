@@ -38,7 +38,7 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
  if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
  return response.json() as Promise<T>;
 }
-export type CoreProfile = { uid: string; email: string; role: PortalRole; display_name: string };
+export type CoreProfile = { uid: string; email: string; role: PortalRole; display_name: string; first_name?: string; last_name?: string; phone_number?: string | null };
 export async function checkBackendHealth(): Promise<boolean> {
  const response = await fetch(`${API_BASE_URL}/health`);
  if (!response.ok) throw new ApiError(response.status, await errorDetail(response));
@@ -54,12 +54,13 @@ export const getCoreRoleAccess = (role: PortalRole) =>
  * accepts a selected role; this must be restricted before production.
  * Never take a role from an arbitrary request when authorising data access.
  */
-export const createCoreProfile = (firstName: string, lastName: string, role: PortalRole) =>
+export const createCoreProfile = (firstName: string, lastName: string, role: PortalRole, phoneNumber = "") =>
  coreRequest<CoreProfile>("/users/me", {
   method: "POST",
   body: JSON.stringify({
    first_name: firstName.trim(),
    last_name: lastName.trim(),
+   phone_number: phoneNumber.trim() || null,
    role,
   }),
  });

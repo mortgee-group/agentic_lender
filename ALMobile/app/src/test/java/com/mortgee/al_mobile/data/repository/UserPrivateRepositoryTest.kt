@@ -292,6 +292,8 @@ class UserPrivateRepositoryTest {
             return true
         }
 
+        override suspend fun isAttemptCurrent(attempt: SessionAttempt): Boolean = false
+
         override suspend fun cancelAttempt(attempt: SessionAttempt) {}
     }
 

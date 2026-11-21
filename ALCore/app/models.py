@@ -39,6 +39,10 @@ class ApplicationStatus(str, Enum):
     FUNDED = "FUNDED"
     CLOSED = "CLOSED"
 
+class UnderwriterDecision(str, Enum):
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
 
 # Accepted property types from AL-Mobile's proposed form.
 PropertyType = Literal[
@@ -110,6 +114,10 @@ class LoanApplication(LoanApplicationCreate):
     riskTier: Literal["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5"] | None = None
     # Application workflow.
     lifecycleStatus: ApplicationStatus = ApplicationStatus.APPLIED
+    # Final decision made by an authorised Underwriter.
+    underwriterDecision: UnderwriterDecision | None = None
+    decidedBy: str | None = None
+    decidedAt: datetime | None = None
 
     # Firestore timestamps.
     createdAt: datetime
@@ -119,4 +127,7 @@ class LoanApplication(LoanApplicationCreate):
 
 class LoanApplicationResponse(LoanApplication):
     applicationId: str
-    
+
+
+class UnderwriterDecisionRequest(BaseModel):
+    decision: UnderwriterDecision
