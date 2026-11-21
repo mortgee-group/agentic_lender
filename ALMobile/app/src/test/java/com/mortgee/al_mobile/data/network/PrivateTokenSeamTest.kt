@@ -490,6 +490,10 @@ class PrivateTokenSeamTest {
             return AuthResult.Failure(com.mortgee.al_mobile.data.model.SignInResult.GenericFailure)
         }
 
+        override suspend fun createAccount(email: String, password: String): AuthResult {
+            return AuthResult.Failure(com.mortgee.al_mobile.data.model.SignInResult.GenericFailure)
+        }
+
         override suspend fun getToken(uid: String, forceRefresh: Boolean): Result<String> {
             tokenRequests.add(uid to forceRefresh)
             val handler = customTokenHandler

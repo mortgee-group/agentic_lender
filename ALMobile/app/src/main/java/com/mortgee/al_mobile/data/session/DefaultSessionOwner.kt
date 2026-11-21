@@ -117,6 +117,12 @@ class DefaultSessionOwner @Inject constructor(
         return invalidateSession()
     }
 
+    override suspend fun isAttemptCurrent(attempt: SessionAttempt): Boolean {
+        return gateMutex.withLock {
+            activeAttempt == attempt
+        }
+    }
+
     override suspend fun cancelAttempt(attempt: SessionAttempt) {
         val matches = gateMutex.withLock {
             if (activeAttempt == attempt) {

@@ -1,26 +1,35 @@
 package com.mortgee.al_mobile.data.network
 
 import com.mortgee.al_mobile.data.model.BackendRole
+import com.mortgee.al_mobile.data.network.model.CreateProfileRequest
+import com.mortgee.al_mobile.di.NetworkModule
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.io.IOException
 
 class ProfileApiServiceTest {
 
     private lateinit var mockWebServer: MockWebServer
     private lateinit var profileApiService: ProfileApiService
+    private lateinit var okHttpClient: OkHttpClient
+    private lateinit var allowedOriginSeam: FakePrivateTokenSeam
 
     @Before
     fun setUp() {
@@ -31,7 +40,9 @@ class ProfileApiServiceTest {
             .addLast(KotlinJsonAdapterFactory())
             .build()
 
-        val okHttpClient = OkHttpClient.Builder().build()
+        allowedOriginSeam = FakePrivateTokenSeam(mockWebServer.url("/"))
+        val interceptor = NetworkModule.providePrivateRequestInterceptor(allowedOriginSeam)
+        okHttpClient = NetworkModule.provideOkHttpClient(interceptor)
 
         val retrofit = Retrofit.Builder()
             .baseUrl(mockWebServer.url("/"))
@@ -39,7 +50,7 @@ class ProfileApiServiceTest {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 
-        profileApiService = retrofit.create(ProfileApiService::class.java)
+        profileApiService = ApiClient(retrofit).createService()
     }
 
     @After
@@ -184,4 +195,213 @@ class ProfileApiServiceTest {
             secondServer.shutdown()
         }
     }
+
+    @Test
+    fun `createProfile sends one POST to users me with candidate token and exact UserProfileCreate JSON and parses 201 as UserProfileDto`() = runTest {
+        val jsonResponse = """
+            {
+                "uid": "firebase_uid_123",
+                "email": "borrower@example.com",
+                "role": "borrower",
+                "display_name": "Test Borrower",
+                "first_name": "Test",
+                "last_name": "Borrower",
+                "phone_number": null,
+                "createdAt": "2026-11-13T12:00:00Z",
+                "updatedAt": "2026-11-13T12:00:00Z"
+            }
+        """.trimIndent()
+
+        mockWebServer.enqueue(MockResponse().setResponseCode(201).setBody(jsonResponse))
+
+        val token = "Bearer candidate-id-token-xyz"
+        val requestDto = CreateProfileRequest.forBorrower(
+            firstName = "Test",
+            lastName = "Borrower",
+        )
+        val profile = profileApiService.createProfile(token, requestDto)
+
+        assertEquals("firebase_uid_123", profile.uid)
+        assertEquals("borrower@example.com", profile.email)
+        assertEquals("borrower", profile.role)
+        assertEquals("Test Borrower", profile.displayName)
+        assertEquals("Test", profile.firstName)
+        assertEquals("Borrower", profile.lastName)
+        assertNull(profile.phoneNumber)
+        assertEquals(BackendRole.BORROWER, profile.decodeRole())
+        assertEquals(1, mockWebServer.requestCount)
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/users/me", request.path)
+        assertEquals(token, request.getHeader("Authorization"))
+        assertEquals(1, request.headers.values("Authorization").size)
+        assertEquals("""{"first_name":"Test","last_name":"Borrower","role":"borrower"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `createProfile preserves HTTP 400, 401, 409, and 422 responses without automatic replay`() = runTest {
+        val statusCodes = listOf(400, 401, 409, 422)
+        for (expectedCode in statusCodes) {
+            val requestCountBefore = mockWebServer.requestCount
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(expectedCode)
+                    .setBody("""{"detail": "Error $expectedCode"}""")
+            )
+
+            try {
+                profileApiService.createProfile(
+                    "Bearer candidate-token-$expectedCode",
+                    CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
+                )
+                fail("Expected HttpException for status code $expectedCode")
+            } catch (e: HttpException) {
+                assertEquals(expectedCode, e.code())
+                assertEquals("""{"detail": "Error $expectedCode"}""", e.response()?.errorBody()?.string())
+            }
+
+            // Ensure exactly one request was sent and no automatic replay occurred
+            assertEquals(requestCountBefore + 1, mockWebServer.requestCount)
+            val recorded = mockWebServer.takeRequest()
+            assertEquals("POST", recorded.method)
+            assertEquals("/users/me", recorded.path)
+        }
+    }
+
+    @Test
+    fun `createProfile with rejected token returns 401 and does not replay`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setBody("""{"error": "Invalid or expired Firebase ID token"}""")
+        )
+
+        try {
+            profileApiService.createProfile(
+                "Bearer rejected-token",
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
+            )
+            fail("Expected HttpException 401 for rejected token")
+        } catch (e: HttpException) {
+            assertEquals(401, e.code())
+        }
+
+        assertEquals(1, mockWebServer.requestCount)
+        val recorded = mockWebServer.takeRequest()
+        assertEquals("Bearer rejected-token", recorded.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `createProfile on interrupted response throws IOException and does not automatically replay mutation`() = runTest {
+        assertFalse("OkHttpClient must disable retryOnConnectionFailure to prevent automatic POST replay", okHttpClient.retryOnConnectionFailure)
+
+        // First response drops connection mid-response; second response would succeed if replayed
+        mockWebServer.enqueue(
+            MockResponse()
+                .setSocketPolicy(SocketPolicy.DISCONNECT_AT_START)
+        )
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(201)
+                .setBody("""{"uid":"u1","email":"e@example.com","role":"borrower"}""")
+        )
+
+        try {
+            profileApiService.createProfile(
+                "Bearer candidate-token",
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
+            )
+            fail("Expected IOException on interrupted connection")
+        } catch (_: IOException) {
+            // Expected transport failure
+        }
+
+        // Verify only 1 request was attempted and the mutation was not replayed
+        assertEquals(1, mockWebServer.requestCount)
+    }
+
+    @Test
+    fun `createProfile enforces origin rule and strips Authorization header for untrusted origins or redirects`() = runTest {
+        // 1. Direct request when origin is not allowed strips Authorization header
+        allowedOriginSeam.allowOrigin = false
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setBody("""{"error": "Missing token"}""")
+        )
+
+        try {
+            profileApiService.createProfile(
+                "Bearer candidate-secret-token",
+                CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
+            )
+            fail("Expected 401 when token is stripped for untrusted origin")
+        } catch (e: HttpException) {
+            assertEquals(401, e.code())
+        }
+
+        val untrustedRequest = mockWebServer.takeRequest()
+        assertNull("Authorization header must be stripped for untrusted origin", untrustedRequest.getHeader("Authorization"))
+
+        // 2. Cross-origin redirect strips Authorization header on follow-up request
+        allowedOriginSeam.allowOrigin = true
+        val secondServer = MockWebServer()
+        secondServer.start()
+        try {
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(307)
+                    .setHeader("Location", secondServer.url("/users/me").toString())
+            )
+            secondServer.enqueue(
+                MockResponse()
+                    .setResponseCode(401)
+                    .setBody("""{"error": "Unauthorized on redirect target"}""")
+            )
+
+            try {
+                profileApiService.createProfile(
+                    "Bearer candidate-secret-token",
+                    CreateProfileRequest.forBorrower(firstName = "Test", lastName = "Borrower")
+                )
+                fail("Expected 401 from redirect target")
+            } catch (e: HttpException) {
+                assertEquals(401, e.code())
+            }
+
+            val firstReq = mockWebServer.takeRequest()
+            assertEquals("Bearer candidate-secret-token", firstReq.getHeader("Authorization"))
+
+            val redirectedReq = secondServer.takeRequest()
+            assertNull("Authorization header must be stripped on cross-origin redirect", redirectedReq.getHeader("Authorization"))
+        } finally {
+            secondServer.shutdown()
+        }
+    }
+
+    private class FakePrivateTokenSeam(
+        private val allowedBaseUrl: HttpUrl
+    ) : PrivateTokenSeam {
+        var allowOrigin: Boolean = true
+
+        override suspend fun getToken(
+            entryKey: com.mortgee.al_mobile.data.session.SessionKey?,
+            forceRefresh: Boolean
+        ): Result<String> = Result.failure(UnsupportedOperationException())
+
+        override suspend fun <T> executePrivate(
+            entryKey: com.mortgee.al_mobile.data.session.SessionKey?,
+            isMutation: Boolean,
+            block: suspend (token: String) -> T
+        ): Result<T> = Result.failure(UnsupportedOperationException())
+
+        override fun isAllowedOrigin(url: HttpUrl): Boolean {
+            if (!allowOrigin) return false
+            return url.host.equals(allowedBaseUrl.host, ignoreCase = true) && url.port == allowedBaseUrl.port
+        }
+
+        override fun isAllowedOrigin(urlString: String): Boolean = false
+    }
 }
+

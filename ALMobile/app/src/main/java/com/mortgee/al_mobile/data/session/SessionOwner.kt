@@ -78,6 +78,14 @@ interface SessionOwner {
     suspend fun signOut(): Boolean
 
     /**
+     * Checks whether the provided [attempt] is still the active pending attempt.
+     *
+     * @param attempt The candidate attempt ticket to verify.
+     * @return true if [attempt] matches the currently active attempt, false if retired, cancelled, or committed.
+     */
+    suspend fun isAttemptCurrent(attempt: SessionAttempt): Boolean
+
+    /**
      * Cancels a pending attempt if it matches the active attempt ID.
      * Transitions state back to [SessionState.SignedOut].
      *

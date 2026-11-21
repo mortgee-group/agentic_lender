@@ -234,6 +234,7 @@ class UserPrivateStoreTest {
         ): Boolean = false
         override suspend fun invalidateSession(): Boolean = true
         override suspend fun signOut(): Boolean = true
+        override suspend fun isAttemptCurrent(attempt: SessionAttempt): Boolean = false
         override suspend fun cancelAttempt(attempt: SessionAttempt) {}
     }
 

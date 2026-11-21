@@ -90,11 +90,33 @@ class SessionOwnerContractTest {
             return invalidateSession()
         }
 
+        override suspend fun isAttemptCurrent(attempt: SessionAttempt): Boolean {
+            return activeAttempt == attempt
+        }
+
         override suspend fun cancelAttempt(attempt: SessionAttempt) {
             if (activeAttempt == attempt) {
                 activeAttempt = null
                 _sessionState.value = SessionState.SignedOut
             }
+        }
+    }
+
+    private class FakeAuthAdapter : com.mortgee.al_mobile.data.auth.AuthAdapter {
+        override val currentUid: String? = null
+        var signOutCount = 0
+
+        override suspend fun signIn(email: String, password: String) =
+            com.mortgee.al_mobile.data.auth.AuthResult.Failure(com.mortgee.al_mobile.data.model.SignInResult.GenericFailure)
+
+        override suspend fun createAccount(email: String, password: String) =
+            com.mortgee.al_mobile.data.auth.AuthResult.Failure(com.mortgee.al_mobile.data.model.SignInResult.GenericFailure)
+
+        override suspend fun getToken(uid: String, forceRefresh: Boolean) = Result.success("token")
+
+        override suspend fun signOut(): Boolean {
+            signOutCount++
+            return true
         }
     }
 
@@ -234,5 +256,109 @@ class SessionOwnerContractTest {
 
         owner.cancelAttempt(attempt)
         assertTrue(owner.sessionState.value is SessionState.SignedOut)
+    }
+
+    @Test
+    fun `DefaultSessionOwner isAttemptCurrent returns true only while attempt is active`() = runTest {
+        val storage = MemoryStorage()
+        val authAdapter = FakeAuthAdapter()
+        val owner = DefaultSessionOwner(storage, authAdapter)
+
+        val attempt = owner.startSignInAttempt()!!
+        assertTrue(owner.isAttemptCurrent(attempt))
+
+        val otherAttempt = SessionAttempt("other_id", SessionAttempt.Type.SIGN_IN)
+        assertFalse(owner.isAttemptCurrent(otherAttempt))
+
+        owner.cancelAttempt(attempt)
+        assertFalse(owner.isAttemptCurrent(attempt))
+    }
+
+    @Test
+    fun `DefaultSessionOwner invalidated attempt cannot publish session or save marker`() = runTest {
+        val storage = MemoryStorage()
+        val authAdapter = FakeAuthAdapter()
+        val owner = DefaultSessionOwner(storage, authAdapter)
+
+        val attempt = owner.startSignInAttempt()!!
+        assertTrue(owner.isAttemptCurrent(attempt))
+
+        // Invalidate while attempt is in progress
+        owner.invalidateSession()
+        assertFalse(owner.isAttemptCurrent(attempt))
+
+        val committed = owner.commitSession(
+            attempt = attempt,
+            uid = "user_invalidated",
+            email = "stale@example.com",
+            role = BackendRole.BORROWER,
+            displayName = "Stale Borrower"
+        )
+
+        assertFalse(committed)
+        assertTrue(owner.sessionState.value is SessionState.SignedOut)
+        assertNull(storage.getCompletedUid())
+        assertNull(owner.currentKey)
+    }
+
+    @Test
+    fun `DefaultSessionOwner cancelled attempt cannot publish session or save marker`() = runTest {
+        val storage = MemoryStorage()
+        val authAdapter = FakeAuthAdapter()
+        val owner = DefaultSessionOwner(storage, authAdapter)
+
+        val attempt = owner.startSignInAttempt()!!
+        owner.cancelAttempt(attempt)
+        assertFalse(owner.isAttemptCurrent(attempt))
+
+        val committed = owner.commitSession(
+            attempt = attempt,
+            uid = "user_cancelled",
+            email = "cancelled@example.com",
+            role = BackendRole.BORROWER,
+            displayName = "Cancelled Borrower"
+        )
+
+        assertFalse(committed)
+        assertTrue(owner.sessionState.value is SessionState.SignedOut)
+        assertNull(storage.getCompletedUid())
+        assertNull(owner.currentKey)
+    }
+
+    @Test
+    fun `DefaultSessionOwner superseded attempt cannot publish or overwrite newer attempt or session`() = runTest {
+        val storage = MemoryStorage()
+        val authAdapter = FakeAuthAdapter()
+        val owner = DefaultSessionOwner(storage, authAdapter)
+
+        val attempt1 = owner.startSignInAttempt()!!
+        owner.cancelAttempt(attempt1)
+
+        val attempt2 = owner.startSignInAttempt()!!
+        assertFalse(owner.isAttemptCurrent(attempt1))
+        assertTrue(owner.isAttemptCurrent(attempt2))
+
+        // Attempt 1 tries to commit late while attempt 2 is active
+        val staleCommit = owner.commitSession(
+            attempt = attempt1,
+            uid = "stale_uid",
+            email = "stale@example.com",
+            role = BackendRole.BORROWER
+        )
+        assertFalse(staleCommit)
+        assertNull(storage.getCompletedUid())
+        assertTrue(owner.sessionState.value is SessionState.Establishing)
+        assertTrue(owner.isAttemptCurrent(attempt2))
+
+        // Attempt 2 commits normally
+        val validCommit = owner.commitSession(
+            attempt = attempt2,
+            uid = "fresh_uid",
+            email = "fresh@example.com",
+            role = BackendRole.BORROWER
+        )
+        assertTrue(validCommit)
+        assertEquals("fresh_uid", storage.getCompletedUid())
+        assertFalse(owner.isAttemptCurrent(attempt2))
     }
 }
