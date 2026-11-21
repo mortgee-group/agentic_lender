@@ -102,47 +102,66 @@ function wrapText(s:string,max=94):string[]{
  result.push(chunk);
  return result;
 }
+/** Reserve room for branding on page 1; other pages use standard body spacing. */
+function splitPdfPages(lines:string[],firstPageLimit=46,otherPageLimit=51):string[][]{
+ const pages:string[][]=[lines.slice(0,firstPageLimit)];
+ for(let i=firstPageLimit;i<lines.length;i+=otherPageLimit)pages.push(lines.slice(i,i+otherPageLimit));
+ return pages;
+}
+
+/** Dependency-free vector AL logo on the first page.
+ * This is a typographic mark, not an embedded official image asset.
+ */
+function firstPageLogoCommands():string[]{
+ return [
+  "0.08 0.29 0.55 rg 45 782 34 34 re f",
+  "1 1 1 rg BT /F2 16 Tf 52 794 Td (AL) Tj ET",
+  "0.09 0.18 0.35 rg BT /F2 18 Tf 90 800 Td (Agentic Lender) Tj ET",
+  "0.35 0.35 0.35 rg BT /F1 9 Tf 90 786 Td (Mortgage Application Report) Tj ET",
+  "0.82 0.86 0.92 RG 45 773 m 550 773 l S",
+  "0 0 0 rg",
+ ];
+}
+
 export function makeReportPdf(record:CoreApplication):Uint8Array{
- const lines=reportLines(record).flatMap(line=>wrapText(ascii(line)));
- const perPage=51;
- const groups:string[][]=[];
- for(let i=0;i<lines.length;i+=perPage)groups.push(lines.slice(i,i+perPage));
+ // Header contains the report title; avoid printing it twice on page one.
+ const lines=reportLines(record).slice(1).flatMap(line=>wrapText(ascii(line)));
+ const groups=splitPdfPages(lines);
  const objects:string[]=[
   "<< /Type /Catalog /Pages 2 0 R >>",
-  "", // parent Pages object filled after page objects are known
+  "",
   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
  ];
  const pageIds:number[]=[];
  for(let page=0;page<groups.length;page++){
   const commands:string[]=[];
+  if(page===0)commands.push(...firstPageLogoCommands());
+  const startY=page===0?746:770;
   for(let line=0;line<groups[page].length;line++){
    const label=groups[page][line];
-   const bold=label==="AGENTIC LENDER - MORTGAGE APPLICATION REPORT"||
-    ["APPLICATION","FINANCIAL DETAILS","PROPERTY","AI-RELATED SUMMARY (APPLICATION FIELDS ONLY)",
-     "FINAL HUMAN UNDERWRITER DECISION","AUDIT AND SETTLEMENT LIMITATIONS"].includes(label);
-   const y=770-line*14;
-   commands.push(`BT /${bold?"F2":"F1"} ${bold?11:9} Tf 45 ${y} Td (${pdfEscape(label)}) Tj ET`);
+   const bold=["APPLICATION","FINANCIAL DETAILS","PROPERTY","AI-RELATED SUMMARY (APPLICATION FIELDS ONLY)","FINAL HUMAN UNDERWRITER DECISION","AUDIT AND SETTLEMENT LIMITATIONS"].includes(label);
+   commands.push("BT /"+(bold?"F2":"F1")+" "+(bold?11:9)+" Tf 45 "+(startY-line*14)+" Td ("+pdfEscape(label)+") Tj ET");
   }
-  commands.push(`BT /F1 8 Tf 45 40 Td (Page ${page+1} of ${groups.length}) Tj ET`);
+  commands.push("BT /F1 8 Tf 45 40 Td (Page "+(page+1)+" of "+groups.length+") Tj ET");
   const stream=commands.join("\n")+"\n";
   const contentId=objects.length+1;
-  objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`);
+  objects.push("<< /Length "+stream.length+" >>\nstream\n"+stream+"endstream");
   const pageId=objects.length+1;
-  objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`);
+  objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents "+contentId+" 0 R >>");
   pageIds.push(pageId);
  }
- objects[1]=`<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map(id=>id+" 0 R").join(" ")}] >>`;
+ objects[1]="<< /Type /Pages /Count "+pageIds.length+" /Kids ["+pageIds.map(id=>id+" 0 R").join(" ")+"] >>";
  let pdf="%PDF-1.4\n";
  const offsets=[0];
  for(let i=0;i<objects.length;i++){
   offsets.push(pdf.length);
-  pdf+=`${i+1} 0 obj\n${objects[i]}\nendobj\n`;
+  pdf+=(i+1)+" 0 obj\n"+objects[i]+"\nendobj\n";
  }
  const xrefOffset=pdf.length;
- pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+ pdf+="xref\n0 "+(objects.length+1)+"\n0000000000 65535 f \n";
  for(let i=1;i<offsets.length;i++)pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
- pdf+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+ pdf+="trailer\n<< /Size "+(objects.length+1)+" /Root 1 0 R >>\nstartxref\n"+xrefOffset+"\n%%EOF\n";
  return new TextEncoder().encode(pdf);
 }
 export function downloadBrowserFile(data:BlobPart,mime:string,filename:string):void{
