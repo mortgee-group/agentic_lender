@@ -5,15 +5,15 @@ import {requestCoreAssessment,requestCoreUnderwriting,type AssessmentResponse,ty
 import AiResults,{exampleAIResponse} from "./AiResults";
 
 type Task="assess"|"underwrite";
-export default function AiActions({applicationId,lifecycleStatus,role,onUpdated}:{
+export default function AiActions({applicationId,lifecycleStatus,role,onUpdated,onUnderwritingCompleted,underwritingResult}:{
  applicationId:string;lifecycleStatus:CoreApplication["lifecycleStatus"];role:PortalRole;onUpdated:()=>void;
+ onUnderwritingCompleted:(response:UnderwritingResponse)=>void;underwritingResult:UnderwritingResponse|null;
 }){
  const canAssess=role==="broker";
  const canUnderwrite=role==="underwriter";
  const [pending,setPending]=useState<Task|null>(null);
  const [working,setWorking]=useState<Task|null>(null);
  const [assessment,setAssessment]=useState<AssessmentResponse|null>(null);
- const [decision,setDecision]=useState<UnderwritingResponse|null>(null);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [showExample,setShowExample]=useState(false);
@@ -27,7 +27,7 @@ export default function AiActions({applicationId,lifecycleStatus,role,onUpdated}
     setNotice("Property valuation completed. AL-Core saved a valuation record.");
    }else{
     const result=await requestCoreUnderwriting(applicationId);
-    setDecision(result);
+    onUnderwritingCompleted(result);
     setNotice("AI underwriting completed. AL-Core saved the decision and updated the application.");
    }
    onUpdated();
@@ -61,8 +61,9 @@ export default function AiActions({applicationId,lifecycleStatus,role,onUpdated}
   {working&&<p role="status">AL-Core is processing the {working==="assess"?"assessment":"underwriting"} request…</p>}
   {error&&<p className="auth-error" role="alert">{error}</p>}
   {notice&&<p role="status" className="core-note">{notice}</p>}
+  {underwritingResult&&<p role="status" className="core-note"><strong>Live AI underwriting results are available below.</strong> Review the recommendation, rationale, conditions, agent findings and credit memo before making a human decision.</p>}
   {showExample&&<AiResults example assessment={exampleAIResponse.assessment} decision={exampleAIResponse.decision}/>}
-  {(assessment||decision)&&<AiResults assessment={assessment} decision={decision}/>}
+  {(assessment||underwritingResult)&&<AiResults assessment={assessment} decision={underwritingResult}/>}
 
  </section>;
 }

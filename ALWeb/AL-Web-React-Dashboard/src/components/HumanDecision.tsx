@@ -2,8 +2,8 @@ import {useState} from "react";
 import {ApiError,submitHumanDecision,type CoreApplication,type HumanDecision} from "../services/api";
 import type {PortalRole} from "../types/roles";
 
-export default function HumanDecision({application,role,onUpdated}:{
- application:CoreApplication;role:PortalRole;onUpdated:()=>void;
+export default function HumanDecision({application,role,onUpdated,aiResultsAvailable}:{
+ application:CoreApplication;role:PortalRole;onUpdated:()=>void;aiResultsAvailable:boolean;
 }){
  const [choice,setChoice]=useState<""|HumanDecision>("");
  const [confirmed,setConfirmed]=useState(false);
@@ -13,7 +13,7 @@ export default function HumanDecision({application,role,onUpdated}:{
  if(role!=="underwriter")return null;
  const eligible=application.lifecycleStatus==="AI_DELIBERATED" && !application.underwriterDecision;
  const submit=async()=>{
-  if(!eligible||!choice||!confirmed||busy)return;
+  if(!eligible||!aiResultsAvailable||!choice||!confirmed||busy)return;
   setBusy(true);setError("");
   try{
    await submitHumanDecision(application.applicationId,choice);
@@ -38,6 +38,7 @@ export default function HumanDecision({application,role,onUpdated}:{
    <p className="core-note">Recorded decisions cannot be changed through this form.</p>
   </div>:success?<p role="status">Decision saved by AL-Core. Refreshing the application…</p>
   :!eligible?<p className="notice" role="status">Final approval or rejection is available only after AI underwriting has finished and the application is in <strong>AI_DELIBERATED</strong> status. Current status: <strong>{application.lifecycleStatus}</strong>.</p>
+  :!aiResultsAvailable?<div className="notice" role="status"><strong>AI underwriting review required.</strong> This application is AI_DELIBERATED, but its detailed saved AI result is not accessible in this session. Final approval and rejection are disabled until the authentic underwriting evidence can be displayed and reviewed. AL-Core is adding a read endpoint for saved AI decisions. Do not rerun underwriting merely to bypass this requirement.</div>
   :<div className="human-decision-form">
    <div className="field"><label htmlFor="human-decision-select">Human decision</label>
     <select id="human-decision-select" value={choice} disabled={busy} onChange={e=>{setChoice(e.target.value as ""|HumanDecision);setConfirmed(false);setError("");}}>
@@ -47,8 +48,9 @@ export default function HumanDecision({application,role,onUpdated}:{
     </select>
    </div>
    {choice&&<p className="human-decision-warning"><strong>{choice==="APPROVED"?"Approve":"Reject"} this mortgage?</strong> This will persist a final Underwriter decision and update the application lifecycle. It cannot be undone using this screen.</p>}
+   <p className="core-note">Review the actual AI recommendation and credit memorandum shown above; the fictional example preview does not count as evidence.</p>
    <label className="human-decision-confirm"><input type="checkbox" checked={confirmed} disabled={!choice||busy} onChange={e=>setConfirmed(e.target.checked)}/>
-    <span>I have reviewed the application and understand this is a human decision, not an automatic AI approval.</span></label>
+    <span>I have reviewed the live AI underwriting recommendation, reasoning and credit memorandum, and understand this is an independent human decision.</span></label>
    <button className="btn primary" type="button" disabled={!choice||!confirmed||busy} onClick={()=>void submit()}>
     {busy?"Saving decision…":choice==="REJECTED"?"Confirm and reject":choice==="APPROVED"?"Confirm and approve":"Select a decision"}
    </button>

@@ -1,5 +1,5 @@
 import {useEffect,useState} from "react";
-import {ApiError,getCoreApplication,type CoreApplication} from "../services/api";
+import {ApiError,getCoreApplication,type CoreApplication,type UnderwritingResponse} from "../services/api";
 import AiActions from "../components/AiActions";
 import HumanDecision from "../components/HumanDecision";
 import type {PortalRole} from "../types/roles";
@@ -17,8 +17,9 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
  const [status,setStatus]=useState<"loading"|"loaded"|"error">("loading");
  const [error,setError]=useState("");
  const [reload,setReload]=useState(0);
+ const [underwritingResult,setUnderwritingResult]=useState<UnderwritingResponse|null>(null);
  useEffect(()=>{
-  let active=true;setRecord(null);setError("");setStatus("loading");
+  let active=true;setError("");setStatus("loading");
   getCoreApplication(applicationId).then(item=>{
    if(!active)return;
    setRecord(item);setStatus("loaded");
@@ -46,7 +47,8 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
   </div></div>
   {status==="loading"&&<div className="panel pad" role="status">Loading application from AL-Core…</div>}
   {status==="error"&&<div className="panel pad auth-error" role="alert">{error}</div>}
-  {status==="loaded"&&record&&<div className="live-detail-sections">
+  {status==="loading"&&record&&<p role="status" className="core-note">Refreshing application data…</p>}
+  {(status==="loaded"||status==="loading")&&record&&<div className="live-detail-sections">
    <div className="notice"><strong>Live test record.</strong> This information was retrieved from AL-Core, not the fictional UI dataset. No changes are made by viewing this page.</div>
    <div className="detail-columns">
     <div className="panel pad"><h2>Application status</h2>
@@ -81,8 +83,8 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
      {field("BER rating",record.property.ber_rating)}
     </div>
    </div>
-   <AiActions applicationId={applicationId} lifecycleStatus={record.lifecycleStatus} role={role} onUpdated={()=>setReload(n=>n+1)}/>
-   <HumanDecision application={record} role={role} onUpdated={()=>setReload(n=>n+1)}/>
+   <AiActions applicationId={applicationId} lifecycleStatus={record.lifecycleStatus} role={role} onUpdated={()=>setReload(n=>n+1)} underwritingResult={underwritingResult} onUnderwritingCompleted={setUnderwritingResult}/>
+   <HumanDecision application={record} role={role} aiResultsAvailable={underwritingResult?.applicationId===record.applicationId} onUpdated={()=>setReload(n=>n+1)}/>
    <div className="panel pad"><h2>Assignment</h2>
     {field("Borrower UID",record.borrowerId)}
     {field("Broker UID",record.brokerId??"Not assigned")}
