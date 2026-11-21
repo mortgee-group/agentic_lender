@@ -252,3 +252,17 @@ def select_least_busy_broker() -> str:
         (broker.id for broker in brokers),
         key=lambda uid: (counts[uid], uid),
     )
+
+
+def has_valuation(application_id: str) -> bool:
+    """Check whether an AI valuation exists for an application."""
+    valuation_docs = (
+        db.collection("valuations")
+        .where(
+            filter=FieldFilter("applicationId", "==", application_id)
+        )
+        .limit(1)
+        .stream()
+    )
+
+    return any(valuation_docs)
