@@ -12,10 +12,11 @@ import LoanFileDetail from "./pages/LoanFileDetail";
 import AIAuditConsole from "./pages/AIAuditConsole";
 import PortalPlaceholder,{type PortalFeature} from "./pages/PortalPlaceholder";
 import DecisionExports from "./pages/DecisionExports";
+import StressTesting from "./pages/StressTesting";
 import About from "./pages/About";
 import {sampleApplications,visibleApplications} from "./data/sampleApplications";
 const labels:Record<Page,string>={"system-status":"AL-Core Connection Status","live-detail":"Live Application Details","new-application":"New Mortgage Application",portal:"Dashboard",pipeline:"Loan Pipeline",files:"Loan Files","file-detail":"Loan File Details",audit:"AI Audit & Deliberation",stress:"Stress Testing",settlement:"Settlement & Export",about:"About Agentic Lender"};
-const features:PortalFeature[]=["stress"];
+const features:PortalFeature[]=[];
 export default function App(){
  const [authStatus,setAuthStatus]=useState<"checking"|"guest"|"authenticated">("checking");
  const [user,setUser]=useState<AuthUser|null>(null);
@@ -42,7 +43,7 @@ export default function App(){
  if(authStatus==="checking")return <div className="auth-shell"><div className="auth-card panel" role="status">Checking login session…</div></div>;
  if(authStatus==="guest"||!user)return <Login onLogin={handleLogin}/>;
  const selectedFile=visible.find(a=>a.id===selectedFileId)??null;
- return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout} isDemo={["audit","file-detail","stress"].includes(page)}/><div className="content">
+ return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout} isDemo={["audit","file-detail"].includes(page)}/><div className="content">
  {page==="system-status"&&<><h1 className="page-title">AL-Core connection status</h1><p className="subtitle">Firebase authentication, backend profile and verified role access.</p><BackendStatus key={user.uid} user={user}/></>}
  {submissionMessage&&(page==="portal"||page==="files")&&<div className="notice" role="status">{submissionMessage}</div>}
  {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} dashboard={page==="portal"}/>}
@@ -50,6 +51,7 @@ export default function App(){
  {page==="new-application"&&user.role==="borrower"&&<NewMortgageApplication onSaved={onSubmitted} onCancel={()=>navigate("files")}/>}
  {page==="file-detail"&&(user.role==="borrower"?<BorrowerApplicationDetail application={selectedFile} onBack={()=>navigate("files")}/>:<LoanFileDetail application={selectedFile} role={user.role} onBack={()=>navigate("pipeline")} onOpenAudit={()=>selectedFile&&openAudit(selectedFile.id)}/>)}
  {page==="audit"&&user.role!=="borrower"&&<AIAuditConsole applications={visible} role={user.role} selectedId={selectedAuditId} onSelect={setSelectedAuditId} onViewFile={openFile}/>}
+ {page==="stress"&&user.role==="underwriter"&&<StressTesting/>}
  {page==="settlement"&&user.role==="underwriter"&&<DecisionExports/>}
  {user.role==="underwriter"&&features.includes(page as PortalFeature)&&<PortalPlaceholder feature={page as PortalFeature} role={user.role} onBack={()=>navigate("portal")}/>}
  {page==="about"&&<About/>}
