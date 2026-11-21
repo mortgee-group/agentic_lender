@@ -106,7 +106,7 @@ export default function StressTesting(){
     <span>Property value field uses the seller asking price ({fmtEuro(selected.sellerAskingPrice)}), not a verified valuation.</span>
     <span>Current rate defaults to {form.currentInterestPct.toFixed(2)}%; AL-Core doesn't provide a contractual interest rate. Verify before running.</span>
    </div>}
-   {source!=="shownSource"&&<p className="core-note">New application selected. Run the stress test to replace the currently displayed results.</p>}
+   {source!==shownSource&&<p className="core-note">New application selected. Run the stress test to replace the currently displayed results.</p>}
   </section>
   <div className="stress-layout">
    <section className="panel pad stress-controls"><h2>Mortgage and property inputs</h2>

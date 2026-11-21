@@ -18,7 +18,7 @@ export default function PortfolioStressTesting({applications,status}:Props){
   setError("");
   setRun({result:calculatePortfolio(applications,{currentInterestPct:rate,rateShockBps:shock,propertyDropPct:drop}),rate,shock,drop});
  };
- const stale=run!==null&&(run.rate!==rate||run.shock!==shock||run.drop!==drop||status!=="loaded");
+ const stale=run!==null&&(run.rate!==rate||run!.shock!==shock||run!.drop!==drop||status!=="loaded");
  const data=run?.result;
  const maxCount=Math.max(1,...(data?.riskBefore??[]),...(data?.riskAfter??[]));
  return <section className="portfolio-stress" aria-label="Portfolio-wide stress testing">
@@ -45,7 +45,7 @@ export default function PortfolioStressTesting({applications,status}:Props){
   </section>
   {data&&<section aria-label="Portfolio scenario results">
    <div className="panel pad section">
-    <h2>Portfolio results <span className="stress-result-sub">+{run.shock} bps · {run.drop}% property downturn · {run.rate.toFixed(2)}% assumed base rate</span></h2>
+    <h2>Portfolio results <span className="stress-result-sub">+{run.shock} bps · {run.drop}% property downturn · {run!.rate.toFixed(2)}% assumed base rate</span></h2>
     <div className="portfolio-metrics">
      <div><span>Applications tested</span><strong>{data.rows.length}</strong></div>
      <div><span>Become unaffordable</span><strong>{data.unaffordable}</strong></div>
