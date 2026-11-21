@@ -10,6 +10,7 @@ from app.ai_client import assess_application, underwrite_application
 from app.applications import (
     create_application,
     get_application,
+    has_valuation,
     list_applications_for_user,
     save_ai_decision,
     save_valuation,
@@ -280,6 +281,11 @@ async def underwrite_mortgage_application(
         raise HTTPException(
             status_code=409,
             detail="AI underwriting has already been completed or is no longer allowed",
+        )
+    if not has_valuation(application_id):
+        raise HTTPException(
+            status_code=409,
+            detail="AI assessment must be completed before underwriting",
         )
 
     underwriting_data = application.model_dump(
