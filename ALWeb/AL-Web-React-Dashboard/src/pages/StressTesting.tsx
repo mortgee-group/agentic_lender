@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {getCoreApplications,type CoreApplication} from "../services/api";
 import {calculateStress,type StressScenario} from "../utils/stressTesting";
+import PortfolioStressTesting from "./PortfolioStressTesting";
 
 const demo:StressScenario={
  loanAmount:280000,propertyValue:350000,annualIncome:85000,existingAnnualDebt:4800,
@@ -29,6 +30,7 @@ const loanFromApplication=(app:CoreApplication,previous:StressScenario):StressSc
  propertyDropPct:previous.propertyDropPct,
 });
 export default function StressTesting(){
+ const [mode,setMode]=useState<"single"|"portfolio">("single");
  const [records,setRecords]=useState<CoreApplication[]>([]);
  const [recordsStatus,setRecordsStatus]=useState<"loading"|"loaded"|"error">("loading");
  const [recordsError,setRecordsError]=useState("");
@@ -74,6 +76,13 @@ export default function StressTesting(){
    but its calculations run locally. It does not call AL-AI, use its ML valuation, change Firestore records or make a lending decision.
    The seller's asking price is a <strong>proxy</strong> for property value, and the initial interest rate is an <strong>editable assumption</strong>.
    Existing debt is treated as annual debt service, following the AL-AI calculation.</div>
+  <div className="stress-mode" role="group" aria-label="Stress testing mode">
+   <button type="button" className="btn secondary" aria-pressed={mode==="single"} onClick={()=>setMode("single")}>Single mortgage</button>
+   <button type="button" className="btn secondary" aria-pressed={mode==="portfolio"} onClick={()=>setMode("portfolio")}>Entire active portfolio</button>
+  </div>
+  {mode==="portfolio"?<><div className="stress-portfolio-refresh"><button type="button" className="btn secondary" disabled={recordsStatus==="loading"} onClick={()=>setRefresh(n=>n+1)}>Refresh applications</button></div>
+   {recordsStatus==="error"&&<p className="auth-error" role="alert">{recordsError}</p>}
+   <PortfolioStressTesting key={refresh} applications={records} status={recordsStatus}/></>:<>
   <section className="panel pad stress-source" aria-label="Select an application">
    <div className="flex-between"><div><h2>Mortgage application</h2><p className="core-note">Select an authorised AL-Core application or continue with the fictional example.</p></div>
     <button className="btn secondary" type="button" disabled={recordsStatus==="loading"} onClick={()=>setRefresh(n=>n+1)}>Refresh applications</button></div>
@@ -158,5 +167,6 @@ export default function StressTesting(){
     </div>
    </section>
   </div>
+  </>}
  </section>;
 }
