@@ -52,3 +52,6 @@
 .ai-agent-line strong{overflow-wrap:anywhere}.ai-agent-line span{white-space:pre-wrap;overflow-wrap:anywhere}
 .ai-raw-trail{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
 @media(max-width:800px){.ai-recommendation{grid-template-columns:1fr}.ai-result-grid{grid-template-columns:1fr}.ai-agent-line{grid-template-columns:1fr;gap:3px}}
+
+/* Live Underwriter decision reports and exports */
+.decision-export .detail-columns{align-items:stretch}.decision-export .detail-columns .panel{display:flex;flex-direction:column;align-items:flex-start;gap:12px}.decision-export .detail-columns .panel p{margin:0}.decision-export .detail-columns .panel .field{width:100%;margin:5px 0}.decision-export .detail-columns .panel .btn{margin-top:auto}.decision-export .notice{line-height:1.6}
