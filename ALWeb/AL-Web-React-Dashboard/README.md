@@ -261,3 +261,13 @@ the full detailed decision trail.
 ## Registration and persistent user profiles
 
 New test registrations collect first name, last name, phone number, email, password and development role. After Firebase signup, AL-Web sends the Firebase ID token and profile fields (`first_name`, `last_name`, `phone_number`, `role`) to `POST /users/me`. Successful signup requires a confirmed AL-Core profile. Sign-in and restored sessions prefer the role from `GET /users/me`; legacy accounts without a profile may use the existing local recovery role and create a missing profile on the AL-Core connection status page. If profile creation fails after signup, sign in with the same account rather than creating another one. Do not use real customer information. Privileged role selection remains temporary and must be restricted by AL-Core before production.
+
+## Standalone Macro Stress Testing (Underwriter)
+
+The Underwriter's Stress Testing navigation now opens a local scenario calculator instead of a placeholder. It starts with **fictional** figures. An Underwriter can edit principal, explicitly assumed property valuation, gross annual income, existing **annual debt service**, repayment term and interest rate; apply a 0–500 bps rate increase and 0–50% property downturn; and compare repayment, DTI, LTV and risk score before and after the shock.
+
+The calculation mirrors the arithmetic and thresholds in `ALAI/app/stress_test.py` (reviewed 21 November 2026): fully amortising monthly repayments, annual debt service / gross income DTI, risk score increments at DTI >35/45% and LTV >80/90%, UNAffORDABLE if stressed DTI >50% or LTV >100%, MARGINAL if DTI >40% or LTV >90%. **Critical difference:** AL-AI uses an RF ML prediction as the original property value. This Web feature instead uses a user-supplied property value; its results cannot be described as ML-backed or equivalent to AL-AI outputs.
+
+The page makes no AL-Core/AL-AI requests, persists nothing and cannot change a loan application or issue a lending decision. Full integrated portfolio stress testing remains a separate dependency.
+
+Manual tests: reset to defaults; compare zero shock vs +100/200/300 bps; test a 10–30% decline; verify LTV and repayments increase as expected; test zero interest and zero existing debt; reject invalid loan/term/income and confirm previous results remain unchanged; verify only Underwriter navigation exposes the page, and that other application routes remain functional.
