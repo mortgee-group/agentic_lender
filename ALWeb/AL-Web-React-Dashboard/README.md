@@ -258,6 +258,10 @@ POST operations. Persistent historical decision retrieval will require an
 authorised read endpoint in AL-Core; reloading the page does not restore
 the full detailed decision trail.
 
+## Registration and persistent user profiles
+
+New test registrations collect first name, last name, phone number, email, password and development role. After Firebase signup, AL-Web sends the Firebase ID token and profile fields (`first_name`, `last_name`, `phone_number`, `role`) to `POST /users/me`. Successful signup requires a confirmed AL-Core profile. Sign-in and restored sessions prefer the role from `GET /users/me`; legacy accounts without a profile may use the existing local recovery role and create a missing profile on the AL-Core connection status page. If profile creation fails after signup, sign in with the same account rather than creating another one. Do not use real customer information. Privileged role selection remains temporary and must be restricted by AL-Core before production.
+
 ## Live loan origination pipeline
 
 Open Assigned Pipeline (Broker) or Loan Pipeline (Underwriter). The pipeline uses authenticated GET /applications, not the Sprint 1 sample dataset. Stage counts and portfolio totals describe all accessible records. Search application IDs, borrower/broker UIDs, county or property type; filter by lifecycle, risk tier, approval likelihood and LTV; sort by date, requested amount or LTV. Missing risk/likelihood values remain unassessed and missing numeric values sort last. Clicking a stage filters the table. View details opens the existing authorised live application detail page. Refresh fetches current records. This is a read-only frontend feature; approval and settlement transitions still require backend implementation. No new dependencies or AL-Core changes are required.
