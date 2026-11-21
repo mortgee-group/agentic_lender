@@ -6,6 +6,7 @@ import Header from "./components/Header";
 import BackendStatus from "./components/BackendStatus";
 import LiveApplications from "./components/LiveApplications";
 import LiveApplicationDetail from "./pages/LiveApplicationDetail";
+import CollateralAssessment from "./pages/CollateralAssessment";
 import NewMortgageApplication from "./pages/NewMortgageApplication";
 import BorrowerApplicationDetail from "./pages/BorrowerApplicationDetail";
 import LoanFileDetail from "./pages/LoanFileDetail";
@@ -13,7 +14,7 @@ import AIAuditConsole from "./pages/AIAuditConsole";
 import PortalPlaceholder,{type PortalFeature} from "./pages/PortalPlaceholder";
 import About from "./pages/About";
 import {sampleApplications,visibleApplications} from "./data/sampleApplications";
-const labels:Record<Page,string>={"system-status":"AL-Core Connection Status","live-detail":"Live Application Details","new-application":"New Mortgage Application",portal:"Dashboard",pipeline:"Loan Pipeline",files:"Loan Files","file-detail":"Loan File Details",audit:"AI Audit & Deliberation",stress:"Stress Testing",settlement:"Settlement & Export",about:"About Agentic Lender"};
+const labels:Record<Page,string>={"system-status":"AL-Core Connection Status","live-detail":"Live Application Details","collateral":"Loan File & Collateral Assessment","new-application":"New Mortgage Application",portal:"Dashboard",pipeline:"Loan Pipeline",files:"Loan Files","file-detail":"Loan File Details",audit:"AI Audit & Deliberation",stress:"Stress Testing",settlement:"Settlement & Export",about:"About Agentic Lender"};
 const features:PortalFeature[]=["stress","settlement"];
 export default function App(){
  const [authStatus,setAuthStatus]=useState<"checking"|"guest"|"authenticated">("checking");
@@ -21,6 +22,7 @@ export default function App(){
  const [page,setPage]=useState<Page>("portal");
  const [selectedFileId,setSelectedFileId]=useState<string|null>(null);
  const [selectedLiveId,setSelectedLiveId]=useState<string|null>(null);
+ const [collateralReturnPage,setCollateralReturnPage]=useState<Page>("files");
  const [liveReturnPage,setLiveReturnPage]=useState<Page>("files");
  const [selectedAuditId,setSelectedAuditId]=useState<string|null>(null);
  const [liveRefresh,setLiveRefresh]=useState(0);
@@ -36,6 +38,7 @@ export default function App(){
  const onSubmitted=(id:string)=>{setSubmissionMessage(`Application ${id} created in Firestore.`);setLiveRefresh(v=>v+1);navigate("files");};
  const visible=user?visibleApplications(user.role,user.username,sampleApplications):[];
  const openLive=(id:string)=>{setSelectedLiveId(id);setLiveReturnPage(page==="portal"||page==="pipeline"||page==="files"?page:"files");navigate("live-detail");};
+ const openCollateral=(id:string)=>{if(user?.role==="borrower")return;setSelectedLiveId(id);setCollateralReturnPage(page==="pipeline"||page==="portal"||page==="files"?page:"files");navigate("collateral");};
  const openFile=(id:string)=>{if(!visible.some(a=>a.id===id))return;setSelectedFileId(id);navigate("file-detail");};
  const openAudit=(id?:string)=>{if(user?.role==="borrower")return;if(id&&!visible.some(a=>a.id===id))return;setSelectedAuditId(id??null);navigate("audit");};
  if(authStatus==="checking")return <div className="auth-shell"><div className="auth-card panel" role="status">Checking login session…</div></div>;
@@ -44,7 +47,8 @@ export default function App(){
  return <div className="layout"><Sidebar page={page} role={user.role} onNavigate={navigate}/><main className="main"><Header title={labels[page]} username={user.username} role={user.role} onLogout={handleLogout} isDemo={["audit","file-detail","stress","settlement"].includes(page)}/><div className="content">
  {page==="system-status"&&<><h1 className="page-title">AL-Core connection status</h1><p className="subtitle">Firebase authentication, backend profile and verified role access.</p><BackendStatus key={user.uid} user={user}/></>}
  {submissionMessage&&(page==="portal"||page==="files")&&<div className="notice" role="status">{submissionMessage}</div>}
- {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} dashboard={page==="portal"}/>}
+ {(page==="portal"||page==="files"||page==="pipeline")&&<LiveApplications key={`${user.uid}-${liveRefresh}`} user={user} onOpenApplication={openLive} onOpenCollateral={user.role==="borrower"?undefined:openCollateral} dashboard={page==="portal"}/>}
+ {page==="collateral"&&selectedLiveId&&user.role!=="borrower"&&<CollateralAssessment key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} role={user.role} onBack={()=>navigate(collateralReturnPage)} onOpenLive={()=>openLive(selectedLiveId)}/>}
  {page==="live-detail"&&selectedLiveId&&<LiveApplicationDetail key={`${user.uid}-${selectedLiveId}`} applicationId={selectedLiveId} role={user.role} onBack={()=>navigate(liveReturnPage)}/>}
  {page==="new-application"&&user.role==="borrower"&&<NewMortgageApplication onSaved={onSubmitted} onCancel={()=>navigate("files")}/>}
  {page==="file-detail"&&(user.role==="borrower"?<BorrowerApplicationDetail application={selectedFile} onBack={()=>navigate("files")}/>:<LoanFileDetail application={selectedFile} role={user.role} onBack={()=>navigate("pipeline")} onOpenAudit={()=>selectedFile&&openAudit(selectedFile.id)}/>)}

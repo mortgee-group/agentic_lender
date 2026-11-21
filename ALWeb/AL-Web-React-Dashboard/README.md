@@ -261,3 +261,9 @@ the full detailed decision trail.
 ## Registration and persistent user profiles
 
 New test registrations collect first name, last name, phone number, email, password and development role. After Firebase signup, AL-Web sends the Firebase ID token and profile fields (`first_name`, `last_name`, `phone_number`, `role`) to `POST /users/me`. Successful signup requires a confirmed AL-Core profile. Sign-in and restored sessions prefer the role from `GET /users/me`; legacy accounts without a profile may use the existing local recovery role and create a missing profile on the AL-Core connection status page. If profile creation fails after signup, sign in with the same account rather than creating another one. Do not use real customer information. Privileged role selection remains temporary and must be restricted by AL-Core before production.
+
+## Live collateral assessment dossier
+
+Broker and Underwriter users can open **Collateral dossier** from an authorised AL-Core application in the live application list. The new `CollateralAssessment.tsx` fetches `GET /applications/{id}` and displays financial, property, assignment and risk summary fields. It computes *indicative asking-price LTV* and deposit percentage only from submitted values, explicitly distinguishing them from the stored estimated LTV. The current read API does not return the ML valuation amount or a complete DTI breakdown, so the comparison and DTI are marked **Not available**, not fabricated. A link returns the user to the existing live application workflow (AI and human approval remain independent). No calls to `/assess` or `/underwrite` are issued when opening the dossier; it is read-only.
+
+Test with both Broker and Underwriter accounts; verify access to authorised applications only, 403/404 handling, refreshing records, unknown valuation and null risk values, and that Borrower users do not see the collateral link. Check navigation back to applications and into live details.

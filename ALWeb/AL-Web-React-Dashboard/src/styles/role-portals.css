@@ -52,3 +52,6 @@
 .ai-agent-line strong{overflow-wrap:anywhere}.ai-agent-line span{white-space:pre-wrap;overflow-wrap:anywhere}
 .ai-raw-trail{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
 @media(max-width:800px){.ai-recommendation{grid-template-columns:1fr}.ai-result-grid{grid-template-columns:1fr}.ai-agent-line{grid-template-columns:1fr;gap:3px}}
+
+/* Live read-only mortgage collateral dossier */
+.collateral-dossier .detail-columns{align-items:start}.collateral-dossier .detail-columns .panel{min-width:0}.collateral-row{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}.collateral-row:last-of-type{border-bottom:0}.collateral-row span{color:var(--muted);min-width:0}.collateral-row small{display:block;color:#8a97a9;font-size:11px;max-width:330px}.collateral-row strong{text-align:right;overflow-wrap:anywhere;max-width:48%;color:var(--ink)}.collateral-metric{font-size:23px!important;letter-spacing:-.5px!important;overflow-wrap:anywhere}.collateral-dossier .panel h2{margin:0 0 12px}.collateral-open{display:block;margin-top:8px;text-align:left}.collateral-dossier .detail-columns .core-note{margin:14px 0 0!important}
