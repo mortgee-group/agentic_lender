@@ -38,7 +38,7 @@ export default function HumanDecision({application,role,onUpdated,aiResultsAvail
    <p className="core-note">Recorded decisions cannot be changed through this form.</p>
   </div>:success?<p role="status">Decision saved by AL-Core. Refreshing the application…</p>
   :!eligible?<p className="notice" role="status">Final approval or rejection is available only after AI underwriting has finished and the application is in <strong>AI_DELIBERATED</strong> status. Current status: <strong>{application.lifecycleStatus}</strong>.</p>
-  :!aiResultsAvailable?<div className="notice" role="status"><strong>AI underwriting review required.</strong> This application is AI_DELIBERATED, but its detailed saved AI result is not accessible in this session. Final approval and rejection are disabled until the authentic underwriting evidence can be displayed and reviewed. AL-Core is adding a read endpoint for saved AI decisions. Do not rerun underwriting merely to bypass this requirement.</div>
+  :!aiResultsAvailable?<div className="notice" role="status"><strong>AI underwriting review required.</strong> This application is AI_DELIBERATED, but detailed AI underwriting evidence has not been loaded. Reload the saved AI evidence above. Final approval and rejection remain disabled until the real AI findings are available to review.</div>
   :<div className="human-decision-form">
    <div className="field"><label htmlFor="human-decision-select">Human decision</label>
     <select id="human-decision-select" value={choice} disabled={busy} onChange={e=>{setChoice(e.target.value as ""|HumanDecision);setConfirmed(false);setError("");}}>

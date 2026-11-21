@@ -176,3 +176,7 @@ export const submitHumanDecision = (applicationId: string, decision: HumanDecisi
  coreRequest<HumanDecisionResponse>(`/applications/${encodeURIComponent(applicationId)}/decision`,{
   method: "PATCH", body: JSON.stringify({decision}),
  });
+
+/** Retrieve the exact persisted AI response. Unlike POST /underwrite, this is read-only. */
+export const getSavedCoreUnderwriting = (applicationId: string) =>
+ coreRequest<UnderwritingResponse>(`/applications/${encodeURIComponent(applicationId)}/ai-decision`);

@@ -1,5 +1,5 @@
 import {useEffect,useState} from "react";
-import {ApiError,getCoreApplication,type CoreApplication,type UnderwritingResponse} from "../services/api";
+import {ApiError,getCoreApplication,getSavedCoreUnderwriting,type CoreApplication,type UnderwritingResponse} from "../services/api";
 import AiActions from "../components/AiActions";
 import HumanDecision from "../components/HumanDecision";
 import type {PortalRole} from "../types/roles";
@@ -18,6 +18,9 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
  const [error,setError]=useState("");
  const [reload,setReload]=useState(0);
  const [underwritingResult,setUnderwritingResult]=useState<UnderwritingResponse|null>(null);
+ const [aiStatus,setAiStatus]=useState<"idle"|"loading"|"loaded"|"missing"|"error">("idle");
+ const [aiError,setAiError]=useState("");
+ const [aiRefresh,setAiRefresh]=useState(0);
  useEffect(()=>{
   let active=true;setError("");setStatus("loading");
   getCoreApplication(applicationId).then(item=>{
@@ -33,6 +36,44 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
   });
   return ()=>{active=false;};
  },[applicationId,reload]);
+ useEffect(()=>{
+  // Fetch persisted AI evidence only for a signed-in Underwriter and an
+  // application that has entered the AI deliberation or later lifecycle.
+  if(role!=="underwriter"||!record||record.applicationId!==applicationId||record.lifecycleStatus==="APPLIED"){
+   setAiStatus("idle");setAiError("");return;
+  }
+  let active=true;
+  setAiStatus("loading");setAiError("");
+  getSavedCoreUnderwriting(applicationId).then(result=>{
+   if(!active)return;
+   // A saved record must belong to the currently selected application.
+   if(result?.applicationId!==applicationId||!result.credit_memo||!result.decision){
+    setUnderwritingResult(null);setAiStatus("error");
+    setAiError("AL-Core returned incomplete or mismatched AI evidence. Human decisions remain disabled.");
+    return;
+   }
+   setUnderwritingResult(result);setAiStatus("loaded");
+  }).catch((cause:unknown)=>{
+   if(!active)return;
+   // A 404 means no saved decision, but it does not mean the application
+   // itself is missing (the application GET already succeeded).
+   setAiStatus(cause instanceof ApiError&&cause.status===404?"missing":"error");
+   setAiError(cause instanceof ApiError&&cause.status===404
+    ?"No saved AI underwriting decision was found for this application."
+    :cause instanceof ApiError&&cause.status===403
+    ?"AL-Core denied access to the saved AI decision (HTTP 403)."
+    :cause instanceof Error?cause.message:"Unable to retrieve saved AI underwriting results.");
+   // A result from a just-completed POST is still usable in this session.
+   setUnderwritingResult(current=>current?.applicationId===applicationId?current:null);
+  });
+  return()=>{active=false;};
+ },[applicationId,role,record?.applicationId,record?.lifecycleStatus,aiRefresh]);
+ const onUnderwritingCompleted=(result:UnderwritingResponse)=>{
+  // The subsequent application refresh will verify the lifecycle.
+  if(result.applicationId!==applicationId)return;
+  setUnderwritingResult(result);
+  setAiStatus("loaded");setAiError("");
+ };
  const field=(label:string,value:string|number)=><div className="detail-row" key={label}>
   <span>{label}</span><strong>{value}</strong>
  </div>;
@@ -83,8 +124,15 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
      {field("BER rating",record.property.ber_rating)}
     </div>
    </div>
-   <AiActions applicationId={applicationId} lifecycleStatus={record.lifecycleStatus} role={role} onUpdated={()=>setReload(n=>n+1)} underwritingResult={underwritingResult} onUnderwritingCompleted={setUnderwritingResult}/>
-   <HumanDecision application={record} role={role} aiResultsAvailable={underwritingResult?.applicationId===record.applicationId} onUpdated={()=>setReload(n=>n+1)}/>
+   {role==="underwriter"&&record.lifecycleStatus!=="APPLIED"&&<div className="panel pad section" aria-label="Saved AI decision status">
+    <h2>Saved AI underwriting evidence</h2>
+    {aiStatus==="loading"&&<p role="status">Retrieving saved AI decision from AL-Core…</p>}
+    {aiStatus==="loaded"&&<p role="status" className="core-note">Saved AI underwriting evidence loaded. Review the findings below before confirming a human decision.</p>}
+    {(aiStatus==="missing"||aiStatus==="error")&&<p role="alert" className="auth-error">{aiError} The human decision form will remain disabled unless genuine evidence is available.</p>}
+    <button type="button" className="btn secondary" disabled={aiStatus==="loading"} onClick={()=>setAiRefresh(n=>n+1)}>Reload AI evidence</button>
+   </div>}
+   <AiActions applicationId={applicationId} lifecycleStatus={record.lifecycleStatus} role={role} onUpdated={()=>setReload(n=>n+1)} underwritingResult={underwritingResult} onUnderwritingCompleted={onUnderwritingCompleted}/>
+   <HumanDecision application={record} role={role} aiResultsAvailable={status==="loaded"&&record.lifecycleStatus==="AI_DELIBERATED"&&underwritingResult?.applicationId===record.applicationId&&Boolean(underwritingResult.credit_memo&&underwritingResult.decision)} onUpdated={()=>setReload(n=>n+1)}/>
    <div className="panel pad"><h2>Assignment</h2>
     {field("Borrower UID",record.borrowerId)}
     {field("Broker UID",record.brokerId??"Not assigned")}
