@@ -52,3 +52,6 @@
 .ai-agent-line strong{overflow-wrap:anywhere}.ai-agent-line span{white-space:pre-wrap;overflow-wrap:anywhere}
 .ai-raw-trail{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto}
 @media(max-width:800px){.ai-recommendation{grid-template-columns:1fr}.ai-result-grid{grid-template-columns:1fr}.ai-agent-line{grid-template-columns:1fr;gap:3px}}
+
+/* Final human lending decision: never silently use an AI output as approval. */
+.human-decision-form{display:grid;gap:14px;margin-top:18px;max-width:650px}.human-decision-form .field{max-width:430px}.human-decision-confirm{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5}.human-decision-confirm input{margin-top:3px;flex-shrink:0}.human-decision-warning{background:#fff7df;border:1px solid #ead39b;border-radius:8px;padding:12px;font-size:13px;line-height:1.5}.human-decision-record{margin-top:18px;border:1px solid var(--line);border-radius:8px;padding:16px}.human-decision-record .detail-row strong{overflow-wrap:anywhere}.human-decision-form .btn{justify-self:start}

@@ -261,3 +261,13 @@ the full detailed decision trail.
 ## Registration and persistent user profiles
 
 New test registrations collect first name, last name, phone number, email, password and development role. After Firebase signup, AL-Web sends the Firebase ID token and profile fields (`first_name`, `last_name`, `phone_number`, `role`) to `POST /users/me`. Successful signup requires a confirmed AL-Core profile. Sign-in and restored sessions prefer the role from `GET /users/me`; legacy accounts without a profile may use the existing local recovery role and create a missing profile on the AL-Core connection status page. If profile creation fails after signup, sign in with the same account rather than creating another one. Do not use real customer information. Privileged role selection remains temporary and must be restricted by AL-Core before production.
+
+## Human Underwriter decision and role-specific AI workflow
+
+- Broker: use **Run property assessment** on assigned live applications in APPLIED status (POST /applications/{id}/assess).
+- Underwriter: use **Run AI underwriting** on APPLIED applications (POST /applications/{id}/underwrite). AL-Core PR #27, if merged and deployed, requires a saved valuation first. No fake assumption is made that valuation has completed.
+- Underwriter: once the application is AI_DELIBERATED, choose **Approve mortgage** or **Reject mortgage**, explicitly acknowledge the action and submit PATCH /applications/{id}/decision with {decision: APPROVED|REJECTED}. The backend authorises the user's role and enforces the lifecycle precondition.
+- Successful approval records UNDERWRITER_APPROVED; rejection records CLOSED with underwriterDecision REJECTED. Application detail shows the recorded decision, deciding UID and time after refresh. A rejected application must not be presented as merely a generic closed approval.
+- This UI only issues real API operations after explicit user action and confirmation. It does not fabricate approval, and cannot override completed decisions. Errors, including concurrent decision conflicts (HTTP 409), are shown without claiming success.
+
+Manual testing: broker assessment for assigned application; underwriter AI underwriting after valuation; ensure an APPLIED application cannot receive a human decision; confirm approved/rejected outcomes on separate fictional applications; refresh and confirm decisions persist; verify broker/borrower never see human decision controls; verify duplicate attempts produce safe errors. The deployed backend and AL-AI must be available for full end-to-end testing.

@@ -89,6 +89,9 @@ export type CoreApplication = {
  riskTier: "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5" | null;
  approvalLikelihood: "High" | "Medium" | "Low" | null;
  lifecycleStatus: "APPLIED" | "AI_DELIBERATED" | "UNDERWRITER_APPROVED" | "FUNDED" | "CLOSED";
+ underwriterDecision?: "APPROVED" | "REJECTED" | null;
+ decidedBy?: string | null;
+ decidedAt?: string | null;
  createdAt: string;
  updatedAt: string;
  submittedAt: string | null;
@@ -159,3 +162,17 @@ export const requestCoreAssessment = (applicationId: string) =>
  coreRequest<AssessmentResponse>(`/applications/${encodeURIComponent(applicationId)}/assess`,{method:"POST"});
 export const requestCoreUnderwriting = (applicationId: string) =>
  coreRequest<UnderwritingResponse>(`/applications/${encodeURIComponent(applicationId)}/underwrite`,{method:"POST"});
+
+/** Human decision: backend enforces the Underwriter role and AI_DELIBERATED state. */
+export type HumanDecision = "APPROVED" | "REJECTED";
+export type HumanDecisionResponse = {
+ applicationId: string;
+ underwriterDecision: HumanDecision;
+ lifecycleStatus: CoreApplication["lifecycleStatus"];
+ decidedBy: string;
+ decidedAt: string;
+};
+export const submitHumanDecision = (applicationId: string, decision: HumanDecision) =>
+ coreRequest<HumanDecisionResponse>(`/applications/${encodeURIComponent(applicationId)}/decision`,{
+  method: "PATCH", body: JSON.stringify({decision}),
+ });

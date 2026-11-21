@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {ApiError,getCoreApplication,type CoreApplication} from "../services/api";
 import AiActions from "../components/AiActions";
+import HumanDecision from "../components/HumanDecision";
 import type {PortalRole} from "../types/roles";
 
 const euro=new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0});
@@ -59,6 +60,8 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
      {field("Estimated LTV",percent(record.estimatedLTV))}
      {field("Risk tier",record.riskTier??"Not assessed")}
      {field("Approval likelihood",record.approvalLikelihood??"Not assessed")}
+     {field("Human decision",record.underwriterDecision??"Awaiting review")}
+     {record.decidedAt&&field("Human decision date",new Date(record.decidedAt).toLocaleString("en-IE"))}
     </div>
     <div className="panel pad"><h2>Financial details</h2>
      {field("Household gross income",amount(record.householdAnnualGrossIncome))}
@@ -78,7 +81,8 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
      {field("BER rating",record.property.ber_rating)}
     </div>
    </div>
-   <AiActions applicationId={applicationId} role={role} onUpdated={()=>setReload(n=>n+1)}/>
+   <AiActions applicationId={applicationId} lifecycleStatus={record.lifecycleStatus} role={role} onUpdated={()=>setReload(n=>n+1)}/>
+   <HumanDecision application={record} role={role} onUpdated={()=>setReload(n=>n+1)}/>
    <div className="panel pad"><h2>Assignment</h2>
     {field("Borrower UID",record.borrowerId)}
     {field("Broker UID",record.brokerId??"Not assigned")}
