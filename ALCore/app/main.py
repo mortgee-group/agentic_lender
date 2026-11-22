@@ -7,6 +7,7 @@ from google.api_core.exceptions import AlreadyExists
 import httpx
 from datetime import datetime, timezone
 from app.ai_client import assess_application, underwrite_application
+from app.tokenization import tokenize_approved_application
 from app.applications import (
     create_application,
     get_application,
@@ -369,4 +370,17 @@ def decide_mortgage_application(
         application_id=application_id,
         underwriter_id=profile.uid,
         decision=data.decision,
+    )
+
+
+@app.post("/applications/{application_id}/tokenize")
+def tokenize_mortgage_application(
+    application_id: str,
+    profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER)),
+):
+    """Tokenize an approved mortgage on the local blockchain."""
+
+    return tokenize_approved_application(
+        application_id=application_id,
+        underwriter_id=profile.uid,
     )

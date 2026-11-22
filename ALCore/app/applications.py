@@ -10,6 +10,7 @@ from app.models import (
     LoanApplicationCreate,
     LoanApplicationResponse,
     UnderwriterDecision,
+    MORTGAGE_APR_BASIS_POINTS,
 )
 
 
@@ -187,6 +188,23 @@ def save_valuation(
     return valuation_ref.id
 
 
+def get_valuation(application_id: str) -> dict | None:
+    """Retrieve the saved property valuation for an application."""
+    valuation_docs = (
+        db.collection("valuations")
+        .where(
+            filter=FieldFilter("applicationId", "==", application_id)
+        )
+        .limit(1)
+        .stream()
+    )
+
+    for document in valuation_docs:
+        return document.to_dict()
+
+    return None
+
+
 def save_underwriter_decision(
     application_id: str,
     underwriter_id: str,
@@ -231,6 +249,18 @@ def save_underwriter_decision(
             "updatedAt": now,
         }
 
+        if decision == UnderwriterDecision.APPROVED:
+            approved_amount = application.get("requestedLoanAmount")
+
+            if approved_amount is None or approved_amount <= 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cannot approve an application without a valid loan amount",
+                )
+
+            updates["approvedLoanAmount"] = approved_amount
+            updates["approvedAprBasisPoints"] = MORTGAGE_APR_BASIS_POINTS
+            updates["interestRateConfirmed"] = True
         transaction.update(application_ref, updates)
 
         return {

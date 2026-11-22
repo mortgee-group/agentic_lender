@@ -1,9 +1,9 @@
 from datetime import datetime
 from enum import Enum
 from typing import Literal
-
 from pydantic import BaseModel, Field, model_validator
-
+# Predefined mortgage product interest rate: 400 basis points = 4.00% APR.
+MORTGAGE_APR_BASIS_POINTS = 400
 
 class UserRole(str, Enum):
     BORROWER = "borrower"
@@ -108,6 +108,9 @@ class LoanApplication(LoanApplicationCreate):
     brokerId: str | None = None
 
     requestedLoanAmount: float | None = Field(default=None, ge=0)
+    approvedLoanAmount: float | None = Field(default=None, gt=0)
+    approvedAprBasisPoints: int | None = Field(default=None, ge=0)
+    interestRateConfirmed: bool = False
     estimatedLTV: float | None = Field(default=None, ge=0)
     DTI: float | None = Field(default=None, ge=0)
     approvalLikelihood: Literal["High", "Medium", "Low"] | None = None
@@ -131,3 +134,16 @@ class LoanApplicationResponse(LoanApplication):
 
 class UnderwriterDecisionRequest(BaseModel):
     decision: UnderwriterDecision
+    confirmInterestRate: bool = False
+
+    @model_validator(mode="after")
+    def validate_interest_rate_confirmation(self):
+        if (
+            self.decision == UnderwriterDecision.APPROVED
+            and not self.confirmInterestRate
+        ):
+            raise ValueError(
+                "Interest rate confirmation is required for approval"
+            )
+
+        return self

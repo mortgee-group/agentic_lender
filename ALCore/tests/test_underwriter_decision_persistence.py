@@ -16,6 +16,7 @@ def setup_firestore_mock(status="AI_DELIBERATED", exists=True):
     mock_snapshot.exists = exists
     mock_snapshot.to_dict.return_value = {
         "lifecycleStatus": status,
+        "requestedLoanAmount": 250000,
     }
 
     return mock_db, mock_ref
@@ -48,6 +49,9 @@ def test_approval_updates_firestore():
     assert args[0] == mock_ref
     assert args[1]["lifecycleStatus"] == "UNDERWRITER_APPROVED"
     assert args[1]["decidedBy"] == "underwriter-123"
+    assert args[1]["approvedLoanAmount"] == 250000
+    assert args[1]["approvedAprBasisPoints"] == 400
+    assert args[1]["interestRateConfirmed"] is True
 
 
 def test_rejection_closes_application():
