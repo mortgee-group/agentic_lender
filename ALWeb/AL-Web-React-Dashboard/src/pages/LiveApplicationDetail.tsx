@@ -1,5 +1,5 @@
 import {useEffect,useState} from "react";
-import {ApiError,getCoreApplication,getSavedCoreUnderwriting,type CoreApplication,type UnderwritingResponse} from "../services/api";
+import {ApiError,getCoreApplication,getSavedCoreUnderwriting,displayRate,type CoreApplication,type UnderwritingResponse} from "../services/api";
 import AiActions from "../components/AiActions";
 import HumanDecision from "../components/HumanDecision";
 import type {PortalRole} from "../types/roles";
@@ -112,6 +112,9 @@ export default function LiveApplicationDetail({applicationId,role,onBack}:{
      {field("Property asking price",amount(record.sellerAskingPrice))}
      {field("Deposit",amount(record.deposit))}
      {field("Requested mortgage",amount(record.requestedLoanAmount))}
+     {record.approvedLoanAmount!=null&&field("Approved mortgage",amount(record.approvedLoanAmount))}
+     {record.approvedAprBasisPoints!=null&&field("Approved mortgage product rate",displayRate(record.approvedAprBasisPoints))}
+     {record.underwriterDecision==="APPROVED"&&field("Product rate confirmed",record.interestRateConfirmed?"Yes":"Not confirmed")}
      {field("Mortgage term",`${record.requestedMortgageTerm} years`)}
     </div>
     <div className="panel pad"><h2>Property details</h2>
