@@ -10,6 +10,8 @@ from app.ai_client import assess_application, underwrite_application
 from app.applications import (
     create_application,
     get_application,
+    get_ai_decision,
+    has_valuation,
     list_applications_for_user,
     save_ai_decision,
     save_valuation,
@@ -281,6 +283,11 @@ async def underwrite_mortgage_application(
             status_code=409,
             detail="AI underwriting has already been completed or is no longer allowed",
         )
+    if not has_valuation(application_id):
+        raise HTTPException(
+            status_code=409,
+            detail="AI assessment must be completed before underwriting",
+        )
 
     underwriting_data = application.model_dump(
         mode="json",
@@ -318,6 +325,34 @@ async def underwrite_mortgage_application(
         )
 
     save_ai_decision(application_id, decision)
+
+    return decision
+
+
+@app.get("/applications/{application_id}/ai-decision")
+def retrieve_ai_decision(
+    application_id: str,
+    profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER)),
+):
+    """Retrieve a saved AI underwriting decision without rerunning AL-AI."""
+
+    # Confirm the mortgage application exists.
+    application = get_application(application_id)
+
+    if application is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    # Retrieve the AI result previously saved in Firestore.
+    decision = get_ai_decision(application_id)
+
+    if decision is None:
+        raise HTTPException(
+            status_code=404,
+            detail="AI underwriting decision not found",
+        )
 
     return decision
 
