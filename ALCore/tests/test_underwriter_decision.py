@@ -62,7 +62,10 @@ def test_underwriter_can_approve_application():
 
         response = client.patch(
             ENDPOINT,
-            json={"decision": "APPROVED"},
+            json={
+                "decision": "APPROVED",
+                "confirmInterestRate": True,
+            },
         )
 
     assert response.status_code == 200
@@ -179,4 +182,14 @@ def test_unauthenticated_user_cannot_approve_application():
     )
 
     mock_save.assert_not_called()
-    
+
+
+def test_underwriter_cannot_approve_without_interest_rate_confirmation():
+    override_role(UserRole.UNDERWRITER)
+
+    response = client.patch(
+        ENDPOINT,
+        json={"decision": "APPROVED"},
+    )
+
+    assert response.status_code == 422

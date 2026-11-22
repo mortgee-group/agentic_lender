@@ -127,3 +127,201 @@ def generate_audit_hash(
     return "0x" + hashlib.sha256(
         canonical_json.encode("utf-8")
     ).hexdigest()
+
+
+def prepare_loan_audit_evidence(
+    application: dict,
+    ai_decision: dict,
+    valuation: dict,
+) -> str:
+    """Validate mortgage evidence and generate its audit hash."""
+
+    # Require explicit human approval.
+    if (
+        application.get("lifecycleStatus") != "UNDERWRITER_APPROVED"
+        or application.get("underwriterDecision") != "APPROVED"
+    ):
+        raise ValueError("Only approved mortgages can be tokenized")
+
+    approved_apr = application.get("approvedAprBasisPoints")
+
+    if (
+        type(approved_apr) is not int
+        or not 0 < approved_apr <= 10000
+        or application.get("interestRateConfirmed") is not True
+    ):
+        raise ValueError("Mortgage interest rate has not been confirmed")
+
+    if not isinstance(ai_decision, dict) or not ai_decision.get("credit_memo"):
+        raise ValueError("AI credit memorandum is missing")
+
+    if not isinstance(valuation, dict) or not valuation.get("valuationPrediction"):
+        raise ValueError("Property valuation is missing")
+
+    # Only the resulting hash will be stored on-chain.
+    underwriter_approval = {
+        "decision": application["underwriterDecision"],
+        "approvedLoanAmount": application.get("approvedLoanAmount"),
+        "approvedAprBasisPoints": approved_apr,
+        "interestRateConfirmed": True,
+        "decidedBy": application.get("decidedBy"),
+        "decidedAt": application.get("decidedAt"),
+    }
+
+    return generate_audit_hash(
+        credit_memo=ai_decision["credit_memo"],
+        valuation_data=valuation,
+        underwriter_approval=underwriter_approval,
+    )
+
+
+def tokenize_loan(
+    application_hash: bytes,
+    principal_cents: int,
+    apr_basis_points: int,
+    term_months: int,
+    borrower_public_id: bytes,
+    audit_hash: bytes,
+) -> dict:
+    """Mint a non-transferable LoanNote on the local Hardhat blockchain."""
+
+    web3 = get_web3()
+    contract = get_loan_contract(web3)
+
+    # The contract owner is the only account authorized to mint.
+    owner = contract.functions.owner().call()
+
+    # Local Hardhat development only: use its unlocked owner account.
+    if web3.eth.chain_id != 31337:
+        raise ValueError("Unlocked-account minting is restricted to local Hardhat")
+
+    if owner not in web3.eth.accounts:
+        raise ValueError("Contract owner is not an unlocked Hardhat account")
+
+    # Prevent duplicate tokenization before submitting a transaction.
+    if contract.functions.tokenizedApplications(application_hash).call():
+        raise ValueError("Application has already been tokenized")
+
+    transaction_hash = contract.functions.tokenizeLoan(
+        application_hash,
+        owner,
+        principal_cents,
+        apr_basis_points,
+        term_months,
+        borrower_public_id,
+        audit_hash,
+    ).transact({"from": owner})
+
+    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
+
+    if receipt.status != 1:
+        raise RuntimeError("Loan tokenization transaction failed")
+
+    # Extract the token ID emitted by the Solidity contract.
+    events = contract.events.LoanTokenized().process_receipt(receipt)
+
+    if len(events) != 1:
+        raise RuntimeError("Expected exactly one LoanTokenized event")
+
+    return {
+        "tokenId": events[0]["args"]["tokenId"],
+        "transactionHash": transaction_hash.hex(),
+        "contractAddress": contract.address,
+        "chainId": web3.eth.chain_id,
+    }
+
+
+def convert_loan_terms(
+    loan_amount: float,
+    mortgage_term_years: int,
+) -> tuple[int, int]:
+    """Convert mortgage terms into the units required by LoanNote.sol."""
+
+    amount = Decimal(str(loan_amount))
+
+    if not amount.is_finite() or amount <= 0:
+        raise ValueError("Mortgage amount must be positive and finite")
+
+    principal_cents = amount * 100
+
+    if principal_cents != principal_cents.to_integral_value():
+        raise ValueError("Mortgage amount cannot have fractions of a cent")
+
+    if not 1 <= mortgage_term_years <= 40:
+        raise ValueError("Mortgage term must be between 1 and 40 years")
+
+    term_months = mortgage_term_years * 12
+
+    return int(principal_cents), term_months
+
+
+def prepare_loan_terms(application: dict) -> dict:
+    """Convert approved mortgage terms into Solidity-compatible values."""
+
+    if (
+        application.get("lifecycleStatus") != "UNDERWRITER_APPROVED"
+        or application.get("underwriterDecision") != "APPROVED"
+    ):
+        raise ValueError("Only approved mortgages can be tokenized")
+
+    approved_amount = application.get("approvedLoanAmount")
+    approved_apr = application.get("approvedAprBasisPoints")
+    mortgage_term = application.get("requestedMortgageTerm")
+
+    if approved_amount is None:
+        raise ValueError("Approved loan amount is missing")
+
+    if (
+        type(approved_apr) is not int
+        or not 0 < approved_apr <= 10000
+        or application.get("interestRateConfirmed") is not True
+    ):
+        raise ValueError("Approved interest rate is not confirmed")
+
+    principal_cents, term_months = convert_loan_terms(
+        loan_amount=approved_amount,
+        mortgage_term_years=mortgage_term,
+    )
+
+    return {
+        "principalCents": principal_cents,
+        "aprBasisPoints": approved_apr,
+        "termMonths": term_months,
+    }
+
+
+def prepare_tokenization_data(
+    application_id: str,
+    application: dict,
+    ai_decision: dict,
+    valuation: dict,
+) -> dict:
+    """Prepare all values required by the LoanNote smart contract."""
+
+    # Validate the approved mortgage.
+    loan_terms = prepare_loan_terms(application)
+
+    # Generate a hash of the lending evidence.
+    audit_hash = prepare_loan_audit_evidence(
+        application,
+        ai_decision,
+        valuation,
+    )
+
+    borrower_id = application.get("borrowerId")
+
+    if not application_id or not borrower_id:
+        raise ValueError("Application or borrower identifier is missing")
+
+    # Hash identifiers instead of putting raw IDs on-chain.
+    application_hash = Web3.keccak(text=application_id)
+    borrower_public_id = Web3.keccak(text=borrower_id)
+
+    return {
+        "applicationHash": application_hash,
+        "principalCents": loan_terms["principalCents"],
+        "aprBasisPoints": loan_terms["aprBasisPoints"],
+        "termMonths": loan_terms["termMonths"],
+        "borrowerPublicId": borrower_public_id,
+        "auditHash": Web3.to_bytes(hexstr=audit_hash),
+    }
