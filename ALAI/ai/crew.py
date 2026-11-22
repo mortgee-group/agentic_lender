@@ -15,10 +15,12 @@ class ALCrew:
     tasks_config = "config/tasks.yaml"
 
     @agent
+    @agent
     def affordability_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["affordability_agent"],
             llm=get_cloud_llm_groq(),
+            # llm=get_local_llm(),
             verbose=True,
         )
 
@@ -27,6 +29,7 @@ class ALCrew:
         return Agent(
             config=self.agents_config["valuation_agent"],
             #llm=get_cloud_llm_gemini(),
+            # llm=get_local_llm(),
             llm=get_cloud_llm_groq(),
             tools=[ValuationLookupTool()],
             verbose=True,
@@ -36,6 +39,7 @@ class ALCrew:
     def market_researcher(self) -> Agent:
         return Agent(
             config=self.agents_config["market_researcher"],
+            # llm=get_local_llm(),
             llm=get_cloud_llm_groq(),
             verbose=True,
         )

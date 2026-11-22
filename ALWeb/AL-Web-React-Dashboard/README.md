@@ -306,6 +306,13 @@ On reopening an Underwriter application in `AI_DELIBERATED` or a later state, AL
 
 Test: Underwriter opens an already AI_DELIBERATED application, refreshes browser, confirms saved AI results and human decision controls; verify APPLIED does not request stored AI evidence, and missing/403/failed GET does not allow a decision without genuine prior POST evidence. Verify Broker/Borrower cannot query the saved AI decision via this UI. After a successful POST underwriting, the result remains visible while the application record refreshes.
 
+## Live loan origination pipeline
+
+Open Assigned Pipeline (Broker) or Loan Pipeline (Underwriter). The pipeline uses authenticated GET /applications, not the Sprint 1 sample dataset. Stage counts and portfolio totals describe all accessible records. Search application IDs, borrower/broker UIDs, county or property type; filter by lifecycle, risk tier, approval likelihood and LTV; sort by date, requested amount or LTV. Missing risk/likelihood values remain unassessed and missing numeric values sort last. Clicking a stage filters the table. View details opens the existing authorised live application detail page. Refresh fetches current records. This is a read-only frontend feature; approval and settlement transitions still require backend implementation. No new dependencies or AL-Core changes are required.
+
+Manual verification: sign in as broker and underwriter; check portfolio counts against GET /applications; test combined filters, reset, all five stage buttons, null values, sorting and empty results; open a record and return to the pipeline; verify Borrower dashboard and My Applications remain unchanged. Test HTTP errors and an account with no assigned applications.
+
+
 ## Underwriter decision reports and exports
 
 The Underwriter's **Settlement & Export** menu now opens a **Decision Reports & Exports** page, without performing settlement. It downloads a portfolio CSV using authenticated `GET /applications` and an individual PDF by re-fetching `GET /applications/{id}`. All data comes from AL-Core, not the fictional UI dataset. The exported PDF includes financial/property fields and any returned `underwriterDecision`, `decidedBy` and `decidedAt`. If no decision exists it says so and never infers approval or rejection from CLOSED status. Historical AI audit trails/credit memorandum, ML valuation value and blockchain receipt are explicitly marked unavailable because the required read endpoints are absent. The PDF is generated using a small, dependency-free browser PDF writer with ASCII transliteration for unsupported characters; the CSV uses formula-injection protection for spreadsheet readers. Nothing is persisted or transmitted beyond the existing authenticated GET requests.
