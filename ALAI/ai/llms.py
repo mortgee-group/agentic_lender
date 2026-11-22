@@ -13,14 +13,14 @@ def get_cloud_llm_groq():
         temperature=0.2,
     )
 
-#def get_cloud_llm_gemini():
-  #  return LLM(
-  #      model="gemini/gemini-3.6-flash",
-   #     api_key=os.getenv("GEMINI_API_KEY"),
-  #      temperature=0.2,
-   #     max_retries=5,      
-   #     timeout=120,
-    #)
+def get_cloud_llm_gemini():
+    return LLM(
+        model="gemini/gemini-3.8-flash",
+        api_key=os.getenv("GEMINI_API_KEY"),
+        temperature=0.2,
+        max_retries=5,      
+        timeout=120,
+    )
 
 
 
