@@ -85,6 +85,9 @@ export type CoreApplication = {
  requestedMortgageTerm: number;
  sellerAskingPrice: number;
  requestedLoanAmount: number | null;
+ approvedLoanAmount?: number | null;
+ approvedAprBasisPoints?: number | null;
+ interestRateConfirmed?: boolean;
  estimatedLTV: number | null;
  riskTier: "Tier 1" | "Tier 2" | "Tier 3" | "Tier 4" | "Tier 5" | null;
  approvalLikelihood: "High" | "Medium" | "Low" | null;
@@ -172,9 +175,14 @@ export type HumanDecisionResponse = {
  decidedBy: string;
  decidedAt: string;
 };
-export const submitHumanDecision = (applicationId: string, decision: HumanDecision) =>
+/** Fixed development rate from AL-Core PR #35; no read endpoint exists yet. */
+export const DEVELOPMENT_MORTGAGE_RATE_BPS = 400;
+export const displayRate = (basisPoints: number) => `${(basisPoints / 100).toFixed(2)}%`;
+
+/** Approvals require explicit rate confirmation; rejections do not. */
+export const submitHumanDecision = (applicationId: string, decision: HumanDecision, confirmInterestRate = false) =>
  coreRequest<HumanDecisionResponse>(`/applications/${encodeURIComponent(applicationId)}/decision`,{
-  method: "PATCH", body: JSON.stringify({decision}),
+  method: "PATCH", body: JSON.stringify({decision,confirmInterestRate:decision==="APPROVED"&&confirmInterestRate}),
  });
 
 /** Retrieve the exact persisted AI response. Unlike POST /underwrite, this is read-only. */
