@@ -12,7 +12,7 @@ const riskDescription=(tier:CoreApplication["riskTier"])=>{
 };
 const date = (value:string|null) => value?value.slice(0,10):"—";
 
-export default function LiveApplications({user,onOpenApplication,dashboard=false}:{user:AuthUser;onOpenApplication:(id:string)=>void;dashboard?:boolean}){
+export default function LiveApplications({user,onOpenApplication,onOpenCollateral,dashboard=false}:{user:AuthUser;onOpenApplication:(id:string)=>void;onOpenCollateral?:(id:string)=>void;dashboard?:boolean}){
  const [records,setRecords]=useState<CoreApplication[]>([]);
  const [status,setStatus]=useState<"loading"|"loaded"|"error">("loading");
  const [error,setError]=useState("");
@@ -82,7 +82,7 @@ export default function LiveApplications({user,onOpenApplication,dashboard=false
      <td>{item.lifecycleStatus}</td>
      <td>{date(item.submittedAt)}</td>
      <td><button type="button" className="link" onClick={()=>onOpenApplication(item.applicationId)}
-      aria-label={`View live application ${item.applicationId}`}>View details →</button></td>
+      aria-label={`View live application ${item.applicationId}`}>View details →</button>{onOpenCollateral&&user.role!=="borrower"&&<button type="button" className="link collateral-open" onClick={()=>onOpenCollateral(item.applicationId)} aria-label={`View collateral assessment for ${item.applicationId}`}>Collateral dossier →</button>}</td>
     </tr>)}</tbody>
    </table></div>
   </>}

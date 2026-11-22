@@ -312,3 +312,9 @@ Open Assigned Pipeline (Broker) or Loan Pipeline (Underwriter). The pipeline use
 
 Manual verification: sign in as broker and underwriter; check portfolio counts against GET /applications; test combined filters, reset, all five stage buttons, null values, sorting and empty results; open a record and return to the pipeline; verify Borrower dashboard and My Applications remain unchanged. Test HTTP errors and an account with no assigned applications.
 
+
+## Live collateral assessment dossier
+
+Broker and Underwriter users can open **Collateral dossier** from an authorised AL-Core application in the live application list. The new `CollateralAssessment.tsx` fetches `GET /applications/{id}` and displays financial, property, assignment and risk summary fields. It computes *indicative asking-price LTV* and deposit percentage only from submitted values, explicitly distinguishing them from the stored estimated LTV. The current read API does not return the ML valuation amount or a complete DTI breakdown, so the comparison and DTI are marked **Not available**, not fabricated. A link returns the user to the existing live application workflow (AI and human approval remain independent). No calls to `/assess` or `/underwrite` are issued when opening the dossier; it is read-only.
+
+Test with both Broker and Underwriter accounts; verify access to authorised applications only, 403/404 handling, refreshing records, unknown valuation and null risk values, and that Borrower users do not see the collateral link. Check navigation back to applications and into live details.
