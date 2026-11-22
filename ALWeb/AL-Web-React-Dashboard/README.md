@@ -306,6 +306,13 @@ On reopening an Underwriter application in `AI_DELIBERATED` or a later state, AL
 
 Test: Underwriter opens an already AI_DELIBERATED application, refreshes browser, confirms saved AI results and human decision controls; verify APPLIED does not request stored AI evidence, and missing/403/failed GET does not allow a decision without genuine prior POST evidence. Verify Broker/Borrower cannot query the saved AI decision via this UI. After a successful POST underwriting, the result remains visible while the application record refreshes.
 
+## Live loan origination pipeline
+
+Open Assigned Pipeline (Broker) or Loan Pipeline (Underwriter). The pipeline uses authenticated GET /applications, not the Sprint 1 sample dataset. Stage counts and portfolio totals describe all accessible records. Search application IDs, borrower/broker UIDs, county or property type; filter by lifecycle, risk tier, approval likelihood and LTV; sort by date, requested amount or LTV. Missing risk/likelihood values remain unassessed and missing numeric values sort last. Clicking a stage filters the table. View details opens the existing authorised live application detail page. Refresh fetches current records. This is a read-only frontend feature; approval and settlement transitions still require backend implementation. No new dependencies or AL-Core changes are required.
+
+Manual verification: sign in as broker and underwriter; check portfolio counts against GET /applications; test combined filters, reset, all five stage buttons, null values, sorting and empty results; open a record and return to the pipeline; verify Borrower dashboard and My Applications remain unchanged. Test HTTP errors and an account with no assigned applications.
+
+
 ## Live collateral assessment dossier
 
 Broker and Underwriter users can open **Collateral dossier** from an authorised AL-Core application in the live application list. The new `CollateralAssessment.tsx` fetches `GET /applications/{id}` and displays financial, property, assignment and risk summary fields. It computes *indicative asking-price LTV* and deposit percentage only from submitted values, explicitly distinguishing them from the stored estimated LTV. The current read API does not return the ML valuation amount or a complete DTI breakdown, so the comparison and DTI are marked **Not available**, not fabricated. A link returns the user to the existing live application workflow (AI and human approval remain independent). No calls to `/assess` or `/underwrite` are issued when opening the dossier; it is read-only.

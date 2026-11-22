@@ -4,7 +4,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
+import time
 import httpx
+
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -53,6 +55,47 @@ _PROPERTY_TYPE_MAP = {
     "UNKNOWN": "Unknown",
 }
 
+# ----- ECB rate cache -----
+_ecb_cache: dict = {"rate": None, "fetched_at": 0.0}
+_ECB_CACHE_TTL = 3600  # seconds (1 hour)
+_ECB_FALLBACK_RATE = 2.65  # last known MRR_FR; used if the API is unreachable
+
+async def get_ecb_main_refinancing_rate() -> float:
+    """Fetch the latest ECB main refinancing rate (fixed rate, MRR_FR).
+
+    Cached for 1 hour. Falls back to a known recent value on failure.
+    """
+    now = time.time()
+    if _ecb_cache["rate"] is not None and (now - _ecb_cache["fetched_at"]) < _ECB_CACHE_TTL:
+        return _ecb_cache["rate"]
+
+    url = (
+        "https://data-api.ecb.europa.eu/service/data/"
+        "FM/D.U2.EUR.4F.KR.MRR_FR.LEV"
+        "?lastNObservations=1"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                url,
+                headers={"Accept": "application/vnd.sdmx.data+json;version=2.0.0"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            # SDMX-JSON v2: dataSets[0].series -> first series -> observations
+            series = next(iter(data["dataSets"][0]["series"].values()))
+            observations = series["observations"]
+            latest_key = max(observations.keys(), key=int)
+            rate = float(observations[latest_key][0])
+
+            _ecb_cache["rate"] = rate
+            _ecb_cache["fetched_at"] = now
+            return rate
+    except Exception:
+        # Keep serving the last cached value if we have one; otherwise fallback
+        return _ecb_cache["rate"] if _ecb_cache["rate"] is not None else _ECB_FALLBACK_RATE
+    
 
 def _normalize_property_type(value: str) -> str:
     """Map Firestore enum values to training-data casing."""
@@ -146,6 +189,8 @@ class AssessResponse(BaseModel):
     dti: float
     stress_tested_repayment: float
     max_borrowing_capacity: float
+    ecb_benchmark_rate: float
+    stress_test_rate: float
 
 
 # ============================================================
@@ -328,7 +373,7 @@ async def stress_test(request: StressTestRequest):
 # Assess (deterministic dossier, no LLM)
 # ============================================================
 @app.post("/api/v1/ai/assess", response_model=AssessResponse)
-def assess(request: AssessRequest):
+async def assess(request: AssessRequest):
     """Deterministic dossier numbers. No LLM, no crew."""
     X = to_dataframe(request.property)
     predicted = float(rf_model.predict(X)[0])
@@ -338,7 +383,8 @@ def assess(request: AssessRequest):
     overval = ((request.sellerAskingPrice - predicted) / predicted * 100) if predicted > 0 else 0
 
     # Stress-test at ECB benchmark + 2% buffer
-    ECB_BENCHMARK = 3.75
+    
+    ECB_BENCHMARK = await get_ecb_main_refinancing_rate()
     stress_rate = ECB_BENCHMARK + 2.0
     r = (stress_rate / 100) / 12
     n = request.requestedMortgageTerm * 12
@@ -346,17 +392,34 @@ def assess(request: AssessRequest):
         monthly = loan / n if n else 0
     else:
         monthly = loan * r * (1 + r) ** n / ((1 + r) ** n - 1)
+    
+        
+
+    
+    # ECB_BENCHMARK = 3.75
+    # stress_rate = ECB_BENCHMARK + 2.0
+    # r = (stress_rate / 100) / 12
+    # n = request.requestedMortgageTerm * 12
+    # if r == 0:
+    #     monthly = loan / n if n else 0
+    # else:
+    #     monthly = loan * r * (1 + r) ** n / ((1 + r) ** n - 1)
+
+    
 
     annual_debt_service = monthly * 12 + request.existingDebtLiabilities
     dti = (annual_debt_service / request.householdAnnualGrossIncome * 100) \
         if request.householdAnnualGrossIncome > 0 else 999
-    max_borrowing = request.householdAnnualGrossIncome * 3.5  # CBI 3.5x rule
+    max_borrowing = request.householdAnnualGrossIncome * 3.5  # CBI 3.5x rule 
+    
 
     return AssessResponse(
-        predicted_value=round(predicted, 2),
-        overvaluation_pct=round(overval, 2),
-        ltv=round(ltv, 2),
-        dti=round(dti, 2),
-        stress_tested_repayment=round(monthly, 2),
-        max_borrowing_capacity=round(max_borrowing, 2),
-    )
+    predicted_value=round(predicted, 2),
+    overvaluation_pct=round(overval, 2),
+    ltv=round(ltv, 2),
+    dti=round(dti, 2),
+    stress_tested_repayment=round(monthly, 2),
+    max_borrowing_capacity=round(max_borrowing, 2),
+    ecb_benchmark_rate=ECB_BENCHMARK,
+    stress_test_rate=stress_rate,
+)

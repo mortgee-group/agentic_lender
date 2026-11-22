@@ -247,9 +247,11 @@ endpoints via `http://localhost:8000/docs`
     "predicted_value": 509479.25,
     "overvaluation_pct": 2.07,
     "ltv": 86.36,
-    "dti": 45.07,
-    "stress_tested_repayment": 2567.72,
-    "max_borrowing_capacity": 332500.0
+    "dti": 41.29,
+    "stress_tested_repayment": 2268.8,
+    "max_borrowing_capacity": 332500.0,
+    "ecb_benchmark_rate": 2.65,
+    "stress_test_rate": 4.65
 }
 ```
 ## Origination pipeline view
