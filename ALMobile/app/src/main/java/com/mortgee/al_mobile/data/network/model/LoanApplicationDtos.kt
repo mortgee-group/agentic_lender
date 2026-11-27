@@ -13,3 +13,20 @@ data class LoanPropertyDto(
     @Json(name = "property_type") val propertyType: String,
     @Json(name = "ber_rating") val berRating: String,
 )
+
+@JsonClass(generateAdapter = false)
+data class CreateLoanRequest(
+    val householdAnnualGrossIncome: Double,
+    val existingDebtLiabilities: Double,
+    val deposit: Double,
+    val requestedMortgageTerm: Int,
+    val sellerAskingPrice: Double,
+    val property: LoanPropertyDto,
+)
+
+@JsonClass(generateAdapter = false)
+data class CreateLoanReceipt(
+    val applicationId: String,
+    val message: String? = null,
+)
+

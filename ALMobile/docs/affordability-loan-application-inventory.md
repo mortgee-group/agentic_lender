@@ -130,8 +130,8 @@ This document catalogs the reusable components, modified files, new production a
 | Card | Title / Outcome | Prerequisites | Target Files (`C` / `M`) | Status |
 |---|---|---|---|---|
 | **LA-01** | Encode the seven property fields | Ready now | `C LoanApplicationDtos.kt`, `C LoanApplicationDtosTest.kt` | **DONE** (`LoanPropertyDto`, `LoanApplicationDtosTest.propertyKeys`) |
-| **LA-02** | Encode a create request and decode its receipt | `LA-01` | `M LoanApplicationDtos.kt`, `M LoanApplicationDtosTest.kt` | Ready now |
-| **LA-03** | Send the create call to the existing HTTP route | `LA-02` | `C LoanApplicationApi.kt`, `C LoanApplicationApiTest.kt` | Pending |
+| **LA-02** | Encode a create request and decode its receipt | `LA-01` | `M LoanApplicationDtos.kt`, `M LoanApplicationDtosTest.kt` | **DONE** (`CreateLoanRequest`, `CreateLoanReceipt`, `LoanApplicationDtosTest.createContract`) |
+| **LA-03** | Send the create call to the existing HTTP route | `LA-02` | `C LoanApplicationApi.kt`, `C LoanApplicationApiTest.kt` | Ready now |
 | **LA-04** | Give the create operation a single-use HTTP body | `LA-03` | `M NetworkModule.kt`, `M LoanApplicationApiTest.kt` | Pending |
 | **LA-05** | Keep an explicit debt choice and discard hidden debt input | Ready now | `C LoanField.kt`, `C LoanDraft.kt`, `C LoanDraftTest.kt` | Ready now |
 | **LA-06** | Parse money without silently changing the entered amount | Ready now | `C LoanValidation.kt`, `C LoanValidationTest.kt` | Ready now |
