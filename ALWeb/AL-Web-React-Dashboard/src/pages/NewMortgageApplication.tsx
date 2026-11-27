@@ -1,5 +1,6 @@
 import {useState,type FormEvent} from "react";
 import {createCoreApplication,type CoreApplicationCreate} from "../services/api";
+import {IRISH_COUNTIES} from "../constants/irishCounties";
 
 type NumericField = "householdAnnualGrossIncome"|"existingDebtLiabilities"|"deposit"|"requestedMortgageTerm"|"sellerAskingPrice"|"floor_area"|"bedrooms"|"bathrooms"|"year_built";
 type FormData = Record<NumericField,string> & {county:string;property_type:string;ber_rating:string};
@@ -30,7 +31,7 @@ export default function NewMortgageApplication({onSaved,onCancel}:{
  const requested=numeric("sellerAskingPrice")-numeric("deposit");
  const submit=async(event:FormEvent<HTMLFormElement>)=>{
   event.preventDefault();setError("");
-  if(!form.county.trim()){setError("Enter a property county.");return;}
+  if(!IRISH_COUNTIES.some(county=>county===form.county)){setError("Select a valid property county.");return;}
   if(numeric("deposit")>=numeric("sellerAskingPrice")){
    setError("Deposit must be less than the asking price.");return;
   }
@@ -41,7 +42,7 @@ export default function NewMortgageApplication({onSaved,onCancel}:{
    requestedMortgageTerm:numeric("requestedMortgageTerm"),
    sellerAskingPrice:numeric("sellerAskingPrice"),
    property:{
-    county:form.county.trim(),
+    county:form.county,
     floor_area:numeric("floor_area"),
     bedrooms:numeric("bedrooms"),
     bathrooms:numeric("bathrooms"),
@@ -74,7 +75,10 @@ export default function NewMortgageApplication({onSaved,onCancel}:{
    <p className="core-form-calculated">Estimated requested mortgage: <strong>{requested>0&&form.sellerAskingPrice&&form.deposit?new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(requested):"—"}</strong></p>
    <h2 className="subhead">Property information</h2>
    <div className="fields">
-    <div className="field"><label htmlFor="county">County</label><input id="county" value={form.county} onChange={e=>update("county",e.target.value)} required disabled={submitting} maxLength={100}/></div>
+    <div className="field"><label htmlFor="county">County</label><select id="county" value={form.county} onChange={e=>update("county",e.target.value)} required disabled={submitting}>
+     <option value="">Select a county…</option>
+     {IRISH_COUNTIES.map(county=><option key={county} value={county}>{county}</option>)}
+    </select></div>
     {input("floor_area","Floor area (m²)",{min:0.01,step:"0.01"})}
     {input("bedrooms","Bedrooms",{min:0})}
     {input("bathrooms","Bathrooms",{min:0})}
