@@ -118,4 +118,72 @@ class LoanHttpErrorsTest {
             ),
         )
     }
+
+    @Test
+    fun httpOutcomes() {
+        assertEquals(
+            LoanSubmitResult.SignInRequired,
+            classifyLoanRejection(401, """{"detail":"Invalid or expired authentication token."}""", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.SignInRequired,
+            classifyLoanRejection(401, null, moshi),
+        )
+
+        assertEquals(
+            LoanSubmitResult.Forbidden,
+            classifyLoanRejection(403, """{"detail":"User profile not found."}""", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Forbidden,
+            classifyLoanRejection(403, """{"detail":"Insufficient permissions. Required role: borrower"}""", moshi),
+        )
+
+        assertEquals(
+            LoanSubmitResult.Invalid(fields = setOf(LoanField.DEPOSIT), other = false),
+            classifyLoanRejection(
+                422,
+                """{"detail":[{"loc":["body","deposit"],"msg":"Input should be greater than or equal to 0"}]}""",
+                moshi,
+            ),
+        )
+
+        assertEquals(
+            LoanSubmitResult.NoBroker,
+            classifyLoanRejection(
+                503,
+                """{"detail":"No brokers are currently available"}""",
+                moshi,
+            ),
+        )
+
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(503, """{"detail":"upstream timeout"}""", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(503, "<html>Service Unavailable</html>", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(503, null, moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(503, """{"detail":["No brokers are currently available"]}""", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(502, """{"detail":"Bad Gateway"}""", moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(307, null, moshi),
+        )
+        assertEquals(
+            LoanSubmitResult.Unconfirmed,
+            classifyLoanRejection(500, """{"detail":"Internal Server Error"}""", moshi),
+        )
+    }
 }

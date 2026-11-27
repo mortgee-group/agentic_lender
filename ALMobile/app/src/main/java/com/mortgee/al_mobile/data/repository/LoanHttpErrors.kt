@@ -5,8 +5,33 @@ import com.squareup.moshi.Moshi
 
 private const val ROOT_DEPOSIT_ERROR_TYPE = "value_error"
 private const val ROOT_DEPOSIT_ERROR_MSG = "Value error, Deposit must be less than the property asking price"
+private const val NO_BROKERS_DETAIL = "No brokers are currently available"
 
 private val LOAN_FIELD_BY_PATH: Map<String, LoanField> = LoanField.entries.associateBy { it.path }
+
+internal fun classifyLoanRejection(code: Int, body: String?, moshi: Moshi): LoanSubmitResult = when (code) {
+    401 -> LoanSubmitResult.SignInRequired
+    403 -> LoanSubmitResult.Forbidden
+    422 -> decodeLoanValidation(moshi, body)
+    503 -> if (isNoBrokersAvailable(moshi, body)) {
+        LoanSubmitResult.NoBroker
+    } else {
+        LoanSubmitResult.Unconfirmed
+    }
+    else -> LoanSubmitResult.Unconfirmed
+}
+
+private fun isNoBrokersAvailable(moshi: Moshi, body: String?): Boolean {
+    if (body.isNullOrBlank()) return false
+    val root = try {
+        moshi.adapter(Any::class.java).fromJson(body)
+    } catch (_: Exception) {
+        return false
+    }
+    val rootMap = root as? Map<*, *> ?: return false
+    val detail = rootMap["detail"] as? String ?: return false
+    return detail == NO_BROKERS_DETAIL
+}
 
 internal fun decodeLoanValidation(moshi: Moshi, body: String?): LoanSubmitResult.Invalid {
     if (body.isNullOrBlank()) {
