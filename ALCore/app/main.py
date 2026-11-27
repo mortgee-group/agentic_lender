@@ -5,6 +5,7 @@ from app.users import get_user_profile, create_user_profile
 from app.permissions import require_role
 from google.api_core.exceptions import AlreadyExists
 import httpx
+import logging
 from datetime import datetime, timezone
 from app.ai_client import assess_application, underwrite_application
 from app.tokenization import tokenize_approved_application
@@ -27,7 +28,7 @@ from app.models import (
     UnderwriterDecisionRequest,
     ApplicationStatus,
 )
-
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Agentic Lender Core API",
     version="0.1.0"
@@ -364,13 +365,49 @@ def decide_mortgage_application(
     data: UnderwriterDecisionRequest,
     profile: UserProfile = Depends(require_role(UserRole.UNDERWRITER)),
 ):
-    """Record the final decision of an authorised Underwriter."""
+    """Record an Underwriter decision and tokenize approved mortgages."""
 
-    return save_underwriter_decision(
+    # Persist the human decision before interacting with the blockchain.
+    result = save_underwriter_decision(
         application_id=application_id,
         underwriter_id=profile.uid,
         decision=data.decision,
     )
+
+    # Only approved mortgages can be tokenized.
+    if result["lifecycleStatus"] != "UNDERWRITER_APPROVED":
+        return result
+
+    try:
+        result["tokenization"] = tokenize_approved_application(
+            application_id=application_id,
+            underwriter_id=profile.uid,
+        )
+
+    except HTTPException as error:
+        logger.warning(
+            "Automatic tokenization unconfirmed for application %s: %s",
+            application_id,
+            error.detail,
+        )
+
+        result["tokenization"] = {
+            "status": "UNCONFIRMED",
+            "detail": error.detail,
+        }
+
+    except Exception:
+        logger.exception(
+            "Unexpected tokenization error for application %s",
+            application_id,
+        )
+
+        result["tokenization"] = {
+            "status": "UNCONFIRMED",
+            "detail": "Automatic tokenization could not be confirmed",
+        }
+
+    return result
 
 
 @app.post("/applications/{application_id}/tokenize")
