@@ -149,5 +149,5 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-18** | Render the seven property controls with valid code choices | `LA-17` | `C LoanPropertyFields.kt`, `M LoanApplicationScreenTest.kt` | **DONE** (`LoanPropertyFields`, `LoanApplicationScreenTest.propertyInputs`) |
 | **LA-19** | Render editing, progress and the returned application reference | `LA-13`, `LA-18` | `C LoanApplicationScreen.kt`, `M LoanApplicationScreenTest.kt` | **DONE** (`LoanApplicationScreen`, `LoanApplicationScreenTest.submissionViews`) |
 | **LA-20** | Add a borrower action to the existing landing screen | Ready now | `M AuthenticatedLandingScreen.kt`, `C LoanLandingActionTest.kt` | **DONE** (`AuthenticatedLandingScreen`, `LoanLandingActionTest`) |
-| **LA-21** | Open and leave the form through the real authenticated landing | `LA-16`, `LA-19`, `LA-20` | `C LoanApplicationRoute.kt`, `M AuthenticatedLandingRoute.kt` | Ready now |
-| **LA-22** | Verify the borrower journey and report the evidence | `LA-21` | Verification only (`testDebugUnitTest`, `assembleDebug`, `connectedDebugAndroidTest`, `pytest`) | Pending |
+| **LA-21** | Open and leave the form through the real authenticated landing | `LA-16`, `LA-19`, `LA-20` | `C LoanApplicationRoute.kt`, `M AuthenticatedLandingRoute.kt` | **DONE** (`LoanApplicationRoute`, `AuthenticatedLandingRoute`) |
+| **LA-22** | Verify the borrower journey and report the evidence | `LA-21` | Verification only (`testDebugUnitTest`, `assembleDebug`, `connectedDebugAndroidTest`, `pytest`) | Ready now |

@@ -3,7 +3,9 @@ package com.mortgee.al_mobile.ui.landing
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.mortgee.al_mobile.data.model.BackendRole
 import com.mortgee.al_mobile.data.session.SessionState
+import com.mortgee.al_mobile.ui.loan.LoanApplicationRoute
 
 /**
  * Stateful route composable for the shared authenticated landing screen.
@@ -18,9 +20,17 @@ fun AuthenticatedLandingRoute(
     authenticatedState: SessionState.Authenticated? = null,
     onSignOut: (() -> Unit)? = null,
 ) {
-    AuthenticatedLandingScreen(
-        authenticatedState = authenticatedState,
-        onSignOut = onSignOut,
-        modifier = modifier
-    )
+    if (authenticatedState?.role == BackendRole.BORROWER) {
+        LoanApplicationRoute(
+            authenticatedState = authenticatedState,
+            onSignOut = onSignOut,
+            modifier = modifier,
+        )
+    } else {
+        AuthenticatedLandingScreen(
+            authenticatedState = authenticatedState,
+            onSignOut = onSignOut,
+            modifier = modifier
+        )
+    }
 }
