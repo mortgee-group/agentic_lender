@@ -3,19 +3,27 @@ package com.mortgee.al_mobile.ui.loan
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,128 +55,219 @@ fun LoanApplicationScreen(
             val errors = state.visibleErrors
             val canSubmit = state.canSubmit
 
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                bottomBar = {
+                    LoanBottomActionBar(
+                        showSubmit = true,
+                        isSending = isSending,
+                        canSubmit = canSubmit,
+                        canGoBack = isEditing,
+                        onSubmit = onSubmit,
+                        onBack = onBack,
+                    )
+                },
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = { if (isEditing) onBack() },
-                        enabled = isEditing,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(text = "Back to account")
+                    state.notice?.let { noticeText ->
+                        Text(
+                            text = noticeText,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
 
-                    Button(
-                        onClick = { if (canSubmit) onSubmit() },
-                        enabled = canSubmit,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(text = "Submit application")
-                    }
-                }
-
-                if (isSending) {
-                    CircularProgressIndicator()
-                }
-
-                state.notice?.let { noticeText ->
                     Text(
-                        text = noticeText,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Affordability",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+
+                    LoanFinanceFields(
+                        draft = state.draft,
+                        errors = errors,
+                        enabled = isEditing,
+                        onEdit = onEdit,
+                        onDebt = onDebt,
+                    )
+
+                    Text(
+                        text = "Property",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+
+                    LoanPropertyFields(
+                        draft = state.draft,
+                        errors = errors,
+                        enabled = isEditing,
+                        onEdit = onEdit,
                     )
                 }
-
-                Text(
-                    text = "Affordability",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-
-                LoanFinanceFields(
-                    draft = state.draft,
-                    errors = errors,
-                    enabled = isEditing,
-                    onEdit = onEdit,
-                    onDebt = onDebt,
-                )
-
-                Text(
-                    text = "Property",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-
-                LoanPropertyFields(
-                    draft = state.draft,
-                    errors = errors,
-                    enabled = isEditing,
-                    onEdit = onEdit,
-                )
             }
         }
 
         LoanPhase.RECEIPT -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "Application submitted",
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                Text(
-                    text = "Reference: ${state.receiptId.orEmpty()}",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Button(onClick = onBack) {
-                    Text(text = "Back to account")
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                bottomBar = {
+                    LoanBottomActionBar(
+                        showSubmit = false,
+                        isSending = false,
+                        canSubmit = false,
+                        canGoBack = true,
+                        onSubmit = onSubmit,
+                        onBack = onBack,
+                    )
+                },
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "Application submitted",
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Text(
+                        text = "Reference: ${state.receiptId.orEmpty()}",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
                 }
             }
         }
 
         LoanPhase.UNCONFIRMED -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = UNCONFIRMED_SUBMISSION_MESSAGE,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Button(onClick = onBack) {
-                    Text(text = "Back to account")
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                bottomBar = {
+                    LoanBottomActionBar(
+                        showSubmit = false,
+                        isSending = false,
+                        canSubmit = false,
+                        canGoBack = true,
+                        onSubmit = onSubmit,
+                        onBack = onBack,
+                    )
+                },
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = UNCONFIRMED_SUBMISSION_MESSAGE,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
                 }
             }
         }
 
         LoanPhase.DENIED -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                state.notice?.let { noticeText ->
-                    Text(
-                        text = noticeText,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge,
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                bottomBar = {
+                    LoanBottomActionBar(
+                        showSubmit = false,
+                        isSending = false,
+                        canSubmit = false,
+                        canGoBack = true,
+                        onSubmit = onSubmit,
+                        onBack = onBack,
                     )
+                },
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    state.notice?.let { noticeText ->
+                        Text(
+                            text = noticeText,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                 }
-                Button(onClick = onBack) {
-                    Text(text = "Back to account")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoanBottomActionBar(
+    showSubmit: Boolean,
+    isSending: Boolean,
+    canSubmit: Boolean,
+    canGoBack: Boolean,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+        ) {
+            HorizontalDivider()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (showSubmit) {
+                    Button(
+                        onClick = { if (canSubmit) onSubmit() },
+                        enabled = canSubmit,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isSending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(text = "Submit application")
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { if (canGoBack) onBack() },
+                        enabled = canGoBack,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "Back to account")
+                    }
+                } else {
+                    Button(
+                        onClick = { if (canGoBack) onBack() },
+                        enabled = canGoBack,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "Back to account")
+                    }
                 }
             }
         }

@@ -257,13 +257,16 @@ class LoanApplicationScreenTest {
 
         // 1. EDITING (incomplete): headings, notice, visibleErrors in both sections, Submit disabled, zero callbacks on compose
         assertFalse(state.canSubmit)
+        assertEquals(1, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithText("No broker is available. Try again later.").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsNotEnabled()
-        composeRule.onNodeWithText("Back to account").performScrollTo().assertIsEnabled()
         composeRule.onNodeWithText("Affordability").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Enter a non-negative amount in euros.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Property").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Enter the county.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
         assertEquals(0, submitCount)
         assertEquals(0, backCount)
         assertEquals(0, editCount)
@@ -278,25 +281,26 @@ class LoanApplicationScreenTest {
         }
         assertTrue(state.canSubmit)
         assertEquals(0, submitCount)
-        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsEnabled()
+        assertEquals(1, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithText("Submit application").performClick()
         assertEquals(1, submitCount)
 
-        composeRule.onNodeWithText("Back to account").performScrollTo().performClick()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().performClick()
         assertEquals(1, backCount)
 
-        // 3. SENDING: progress indicator shown; edits, Submit, and Back are disabled and emit zero callbacks
+        // 3. SENDING: progress indicator shown inside bottom submit button with text removed; edits, Submit, and Back are disabled and emit zero callbacks
         composeRule.runOnIdle {
             state = state.copy(phase = LoanPhase.SENDING)
         }
-        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsNotEnabled()
-        composeRule.onNodeWithText("Back to account").performScrollTo().assertIsNotEnabled()
+        assertEquals(0, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithTag(LoanField.INCOME.path).performScrollTo().assertIsNotEnabled()
         composeRule.onNodeWithTag(LoanField.COUNTY.path).performScrollTo().assertIsNotEnabled()
 
-        composeRule.onNodeWithText("Submit application").performScrollTo().performClick()
-        composeRule.onNodeWithText("Back to account").performScrollTo().performClick()
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).performClick()
+        composeRule.onNodeWithText("Back to account").performClick()
         assertEquals(1, submitCount)
         assertEquals(1, backCount)
 
@@ -341,5 +345,107 @@ class LoanApplicationScreenTest {
         assertEquals(1, submitCount)
         assertEquals(0, editCount)
         assertEquals(0, debtCount)
+    }
+
+    @Test
+    fun submitStaysVisibleWhileScrollingAndWithKeyboardOpen() {
+        val validDraft = LoanDraft(
+            values = mapOf(
+                LoanField.INCOME to "75000",
+                LoanField.DEBT to "10000",
+                LoanField.DEPOSIT to "70000",
+                LoanField.TERM to "30",
+                LoanField.PRICE to "350000",
+                LoanField.COUNTY to "Kilkenny",
+                LoanField.AREA to "115",
+                LoanField.BEDS to "3",
+                LoanField.BATHS to "2",
+                LoanField.YEAR to "2005",
+                LoanField.TYPE to "SEMI_DETACHED",
+                LoanField.BER to "B2",
+            ),
+            hasDebt = true,
+        )
+
+        var state by mutableStateOf(
+            LoanUiState(
+                phase = LoanPhase.EDITING,
+                draft = LoanDraft(),
+            )
+        )
+        var submitCount = 0
+
+        composeRule.setContent {
+            LoanApplicationScreen(
+                state = state,
+                onEdit = { field, text ->
+                    state = state.copy(
+                        draft = state.draft.edit(field, text),
+                        touched = state.touched + field,
+                    )
+                },
+                onDebt = { yes ->
+                    state = state.copy(
+                        draft = state.draft.chooseDebt(yes),
+                        touched = state.touched + LoanField.DEBT,
+                    )
+                },
+                onSubmit = { submitCount++ },
+                onBack = {},
+            )
+        }
+
+        // At top (income): Submit is visible at bottom with Back directly under it; disabled for invalid form
+        composeRule.onNodeWithTag(LoanField.INCOME.path).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+        assertEquals(1, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+
+        val incomeBounds = composeRule.onNodeWithTag(LoanField.INCOME.path).fetchSemanticsNode().boundsInRoot
+        val submitBoundsAtTop = composeRule.onNodeWithText("Submit application").fetchSemanticsNode().boundsInRoot
+        val backBoundsAtTop = composeRule.onNodeWithText("Back to account").fetchSemanticsNode().boundsInRoot
+        assertTrue(incomeBounds.bottom <= submitBoundsAtTop.top)
+        assertTrue(submitBoundsAtTop.bottom <= backBoundsAtTop.top)
+
+        // Scroll to last field (BER): BER is fully in view above Submit; Back remains under Submit
+        composeRule.onNodeWithTag(LoanField.BER.path).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+
+        val berBounds = composeRule.onNodeWithTag(LoanField.BER.path).fetchSemanticsNode().boundsInRoot
+        val submitBoundsAtBottom = composeRule.onNodeWithText("Submit application").fetchSemanticsNode().boundsInRoot
+        val backBoundsAtBottom = composeRule.onNodeWithText("Back to account").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected BER bottom (${berBounds.bottom}) to be above Submit top (${submitBoundsAtBottom.top})",
+            berBounds.bottom <= submitBoundsAtBottom.top,
+        )
+        assertTrue(submitBoundsAtBottom.bottom <= backBoundsAtBottom.top)
+
+        // Focus a text field to open the keyboard: Submit stays visible and disabled for invalid form
+        composeRule.onNodeWithTag(LoanField.YEAR.path).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+
+        // Valid form enables Submit; one tap invokes onSubmit once
+        composeRule.runOnIdle {
+            state = state.copy(draft = validDraft)
+        }
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithText("Submit application").performClick()
+        assertEquals(1, submitCount)
+
+        // SENDING replaces Submit text with loading indicator in bottom bar above Back to account
+        composeRule.runOnIdle {
+            state = state.copy(phase = LoanPhase.SENDING)
+        }
+        assertEquals(0, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
+        val progressBounds = composeRule
+            .onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val backBoundsInSending = composeRule.onNodeWithText("Back to account").fetchSemanticsNode().boundsInRoot
+        assertTrue(progressBounds.bottom <= backBoundsInSending.top)
     }
 }
