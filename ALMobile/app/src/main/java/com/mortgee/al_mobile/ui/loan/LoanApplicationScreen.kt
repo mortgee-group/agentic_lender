@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 internal const val UNCONFIRMED_SUBMISSION_MESSAGE =
     "We couldn’t confirm submission. Ask your lender to check for an existing application before starting again."
@@ -170,5 +172,107 @@ fun LoanApplicationScreen(
                 }
             }
         }
+    }
+}
+
+private val previewValidLoanDraft = LoanDraft(
+    values = mapOf(
+        LoanField.INCOME to "75000",
+        LoanField.DEBT to "10000",
+        LoanField.DEPOSIT to "70000",
+        LoanField.TERM to "30",
+        LoanField.PRICE to "350000",
+        LoanField.COUNTY to "Kilkenny",
+        LoanField.AREA to "115",
+        LoanField.BEDS to "3",
+        LoanField.BATHS to "2",
+        LoanField.YEAR to "2005",
+        LoanField.TYPE to "SEMI_DETACHED",
+        LoanField.BER to "B2",
+    ),
+    hasDebt = true,
+)
+
+@Preview(showBackground = true)
+@Composable
+fun LoanApplicationScreenEditingPreview() {
+    ALMobileTheme {
+        LoanApplicationScreen(
+            state = LoanUiState(
+                phase = LoanPhase.EDITING,
+                draft = previewValidLoanDraft,
+            ),
+            onEdit = { _, _ -> },
+            onDebt = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanApplicationScreenSendingPreview() {
+    ALMobileTheme {
+        LoanApplicationScreen(
+            state = LoanUiState(
+                phase = LoanPhase.SENDING,
+                draft = previewValidLoanDraft,
+            ),
+            onEdit = { _, _ -> },
+            onDebt = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanApplicationScreenReceiptPreview() {
+    ALMobileTheme {
+        LoanApplicationScreen(
+            state = LoanUiState(
+                phase = LoanPhase.RECEIPT,
+                receiptId = "application-001",
+            ),
+            onEdit = { _, _ -> },
+            onDebt = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanApplicationScreenUnconfirmedPreview() {
+    ALMobileTheme {
+        LoanApplicationScreen(
+            state = LoanUiState(
+                phase = LoanPhase.UNCONFIRMED,
+            ),
+            onEdit = { _, _ -> },
+            onDebt = {},
+            onSubmit = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanApplicationScreenDeniedPreview() {
+    ALMobileTheme {
+        LoanApplicationScreen(
+            state = LoanUiState(
+                phase = LoanPhase.DENIED,
+                notice = "Borrower access is required.",
+            ),
+            onEdit = { _, _ -> },
+            onDebt = {},
+            onSubmit = {},
+            onBack = {},
+        )
     }
 }

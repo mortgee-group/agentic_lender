@@ -36,9 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mortgee.al_mobile.data.model.CatalogueError
+import com.mortgee.al_mobile.data.model.PropertyListing
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -301,5 +304,44 @@ private fun formatPropertyType(rawType: String): String {
         "TOWN_HOUSE" -> "Townhouse"
         "COMMERCIAL" -> "Commercial"
         else -> rawType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PropertyDetailScreenSuccessPreview() {
+    ALMobileTheme {
+        PropertyDetailScreen(
+            uiState = PropertyDetailUiState.Success(
+                property = PropertyListing(
+                    id = "prop-1",
+                    title = "Modern 3-Bed Semi-Detached",
+                    summary = "Spacious family home near Kilkenny city centre.",
+                    description = "Turnkey 3-bedroom semi-detached residence featuring high-efficiency heating, south-facing garden, and off-street parking.",
+                    price = 350000.0,
+                    currency = "EUR",
+                    category = "Residential",
+                    isAvailable = true,
+                    location = "Kilkenny",
+                    propertySizeSqm = 115.0,
+                    bedrooms = 3,
+                    propertyType = "SEMI_DETACHED",
+                    berRating = "B2",
+                )
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PropertyDetailScreenErrorPreview() {
+    ALMobileTheme {
+        PropertyDetailScreen(
+            uiState = PropertyDetailUiState.Error(
+                message = "The requested property could not be found.",
+                error = CatalogueError.NotFound,
+            )
+        )
     }
 }

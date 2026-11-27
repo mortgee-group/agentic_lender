@@ -41,10 +41,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mortgee.al_mobile.data.model.CatalogueError
+import com.mortgee.al_mobile.data.model.Page
 import com.mortgee.al_mobile.data.model.PropertyListing
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -377,5 +380,66 @@ private fun formatPropertyType(rawType: String): String {
         "TOWN_HOUSE" -> "Townhouse"
         "COMMERCIAL" -> "Commercial"
         else -> rawType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PropertyCatalogueScreenSuccessPreview() {
+    ALMobileTheme {
+        PropertyCatalogueScreen(
+            uiState = PropertyCatalogueUiState.Success(
+                page = Page(
+                    items = listOf(
+                        PropertyListing(
+                            id = "prop-1",
+                            title = "Modern 3-Bed Semi-Detached",
+                            summary = "Spacious family home near Kilkenny city centre.",
+                            price = 350000.0,
+                            currency = "EUR",
+                            isAvailable = true,
+                            location = "Kilkenny",
+                            propertySizeSqm = 115.0,
+                            bedrooms = 3,
+                            propertyType = "SEMI_DETACHED",
+                            berRating = "B2",
+                        ),
+                        PropertyListing(
+                            id = "prop-2",
+                            title = "City Centre Studio Apartment",
+                            summary = "Bright open-plan studio close to transport links.",
+                            price = 240000.0,
+                            currency = "EUR",
+                            isAvailable = false,
+                            location = "Dublin",
+                            propertySizeSqm = 48.0,
+                            bedrooms = 0,
+                            propertyType = "APARTMENT",
+                            berRating = "A3",
+                        ),
+                    ),
+                    page = 1,
+                    pageSize = 20,
+                    totalCount = 2,
+                    hasMore = false,
+                )
+            ),
+            isTestFeatureEnabled = true,
+            onTestFeatureClick = {},
+            onSignOut = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PropertyCatalogueScreenErrorPreview() {
+    ALMobileTheme {
+        PropertyCatalogueScreen(
+            uiState = PropertyCatalogueUiState.Error(
+                message = "Unable to connect to catalogue service.",
+                error = CatalogueError.NetworkError,
+            )
+        )
     }
 }

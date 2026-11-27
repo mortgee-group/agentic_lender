@@ -18,9 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mortgee.al_mobile.data.model.LoanField
 import com.mortgee.al_mobile.ui.form.PropertyFormValidator
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 @Composable
 fun LoanPropertyFields(
@@ -166,5 +168,45 @@ private fun LoanCodePicker(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanPropertyFieldsFilledPreview() {
+    ALMobileTheme {
+        LoanPropertyFields(
+            draft = LoanDraft(
+                values = mapOf(
+                    LoanField.COUNTY to "Kilkenny",
+                    LoanField.AREA to "115",
+                    LoanField.BEDS to "3",
+                    LoanField.BATHS to "2",
+                    LoanField.YEAR to "2005",
+                    LoanField.TYPE to "SEMI_DETACHED",
+                    LoanField.BER to "B2",
+                ),
+            ),
+            errors = emptyMap(),
+            enabled = true,
+            onEdit = { _, _ -> },
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanPropertyFieldsErrorsPreview() {
+    ALMobileTheme {
+        LoanPropertyFields(
+            draft = LoanDraft(),
+            errors = mapOf(
+                LoanField.COUNTY to "Enter the county.",
+                LoanField.TYPE to "Property type is required",
+                LoanField.BER to "BER rating is required",
+            ),
+            enabled = true,
+            onEdit = { _, _ -> },
+        )
     }
 }

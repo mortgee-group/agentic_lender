@@ -34,7 +34,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.mortgee.al_mobile.ui.form.PropertyFormValidationResult
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -252,5 +255,31 @@ fun TestFeatureScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TestFeatureScreenPreview() {
+    ALMobileTheme {
+        TestFeatureScreen(
+            uiState = TestFeatureUiState(
+                isFeatureEnabled = true,
+                apiBaseUrl = "https://api.example.test/",
+                buildType = "debug",
+                locationInput = "Kilkenny",
+                sizeSqmInput = "115",
+                bedroomsInput = "3",
+                propertyTypeInput = "SEMI_DETACHED",
+                berRatingInput = "B2",
+                validationResult = PropertyFormValidationResult(
+                    isLocationValid = true,
+                    isSizeValid = true,
+                    isBedroomsValid = true,
+                    isPropertyTypeValid = true,
+                    isBerRatingValid = true,
+                ),
+            )
+        )
     }
 }

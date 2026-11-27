@@ -13,8 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 @Composable
 fun LoanFinanceFields(
@@ -148,4 +150,45 @@ internal fun LoanTextInput(
             .fillMaxWidth()
             .testTag(f.path),
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanFinanceFieldsWithDebtPreview() {
+    ALMobileTheme {
+        LoanFinanceFields(
+            draft = LoanDraft(
+                values = mapOf(
+                    LoanField.INCOME to "75000",
+                    LoanField.DEBT to "10000",
+                    LoanField.DEPOSIT to "70000",
+                    LoanField.TERM to "30",
+                    LoanField.PRICE to "350000",
+                ),
+                hasDebt = true,
+            ),
+            errors = emptyMap(),
+            enabled = true,
+            onEdit = { _, _ -> },
+            onDebt = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoanFinanceFieldsErrorsPreview() {
+    ALMobileTheme {
+        LoanFinanceFields(
+            draft = LoanDraft(),
+            errors = mapOf(
+                LoanField.INCOME to "Enter a non-negative amount in euros.",
+                LoanField.DEBT to "Choose Yes or No.",
+                LoanField.DEPOSIT to "Deposit must be less than the seller asking price.",
+            ),
+            enabled = true,
+            onEdit = { _, _ -> },
+            onDebt = {},
+        )
+    }
 }
