@@ -134,8 +134,8 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-03** | Send the create call to the existing HTTP route | `LA-02` | `C LoanApplicationApi.kt`, `C LoanApplicationApiTest.kt` | **DONE** (`LoanApplicationApi`, `LoanApplicationApiTest.createWire`) |
 | **LA-04** | Give the create operation a single-use HTTP body | `LA-03` | `M NetworkModule.kt`, `M LoanApplicationApiTest.kt` | **DONE** (`NetworkModule.provideLoanApplicationApi`, `LoanApplicationApiTest`) |
 | **LA-05** | Keep an explicit debt choice and discard hidden debt input | Ready now | `C LoanField.kt`, `C LoanDraft.kt`, `C LoanDraftTest.kt` | **DONE** (`LoanField`, `LoanDraft`, `LoanDraftTest`) |
-| **LA-06** | Parse money without silently changing the entered amount | Ready now | `C LoanValidation.kt`, `C LoanValidationTest.kt` | Ready now |
-| **LA-07** | Validate the five financial values together | `LA-05`, `LA-06` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Pending (`LA-06` prerequisite) |
+| **LA-06** | Parse money without silently changing the entered amount | Ready now | `C LoanValidation.kt`, `C LoanValidationTest.kt` | **DONE** (`loanMoney`, `LoanValidationTest.moneyParsing`) |
+| **LA-07** | Validate the five financial values together | `LA-05`, `LA-06` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Ready now |
 | **LA-08** | Validate the complete ALCore property | `LA-07`, `LA-01` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Pending |
 | **LA-09** | Build a POST body only from a complete draft | `LA-08`, `LA-02` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Pending |
 | **LA-10** | Map FastAPI validation errors to form fields | `LA-02`, `LA-05` | `C LoanApplicationRepository.kt`, `C LoanHttpErrors.kt`, `C LoanHttpErrorsTest.kt` | Ready now |
