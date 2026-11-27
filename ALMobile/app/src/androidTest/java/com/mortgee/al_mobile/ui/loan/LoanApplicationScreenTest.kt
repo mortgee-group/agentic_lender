@@ -3,22 +3,29 @@ package com.mortgee.al_mobile.ui.loan
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.repository.LoanSubmitResult
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -203,5 +210,136 @@ class LoanApplicationScreenTest {
         composeRule.onNodeWithTag(LoanField.TYPE.path).performClick()
         composeRule.onNodeWithTag(LoanField.BER.path).performClick()
         assertEquals(countBeforeDisable, callbackEvents.size)
+    }
+
+    @Test
+    fun submissionViews() {
+        val validDraft = LoanDraft(
+            values = mapOf(
+                LoanField.INCOME to "75000",
+                LoanField.DEBT to "10000",
+                LoanField.DEPOSIT to "70000",
+                LoanField.TERM to "30",
+                LoanField.PRICE to "350000",
+                LoanField.COUNTY to "Kilkenny",
+                LoanField.AREA to "115",
+                LoanField.BEDS to "3",
+                LoanField.BATHS to "2",
+                LoanField.YEAR to "2005",
+                LoanField.TYPE to "SEMI_DETACHED",
+                LoanField.BER to "B2",
+            ),
+            hasDebt = true,
+        )
+
+        var state by mutableStateOf(
+            LoanUiState(
+                phase = LoanPhase.EDITING,
+                draft = LoanDraft(),
+                touched = setOf(LoanField.INCOME, LoanField.COUNTY),
+                notice = "No broker is available. Try again later.",
+            )
+        )
+        var editCount = 0
+        var debtCount = 0
+        var submitCount = 0
+        var backCount = 0
+
+        composeRule.setContent {
+            LoanApplicationScreen(
+                state = state,
+                onEdit = { _, _ -> editCount++ },
+                onDebt = { _ -> debtCount++ },
+                onSubmit = { submitCount++ },
+                onBack = { backCount++ },
+            )
+        }
+
+        // 1. EDITING (incomplete): headings, notice, visibleErrors in both sections, Submit disabled, zero callbacks on compose
+        assertFalse(state.canSubmit)
+        composeRule.onNodeWithText("No broker is available. Try again later.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").performScrollTo().assertIsEnabled()
+        composeRule.onNodeWithText("Affordability").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Enter a non-negative amount in euros.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Property").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Enter the county.").performScrollTo().assertIsDisplayed()
+        assertEquals(0, submitCount)
+        assertEquals(0, backCount)
+        assertEquals(0, editCount)
+        assertEquals(0, debtCount)
+
+        // 2. EDITING (valid draft): Submit enabled; only explicit button click invokes onSubmit
+        composeRule.runOnIdle {
+            state = LoanUiState(
+                phase = LoanPhase.EDITING,
+                draft = validDraft,
+            )
+        }
+        assertTrue(state.canSubmit)
+        assertEquals(0, submitCount)
+        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsEnabled()
+        composeRule.onNodeWithText("Submit application").performClick()
+        assertEquals(1, submitCount)
+
+        composeRule.onNodeWithText("Back to account").performScrollTo().performClick()
+        assertEquals(1, backCount)
+
+        // 3. SENDING: progress indicator shown; edits, Submit, and Back are disabled and emit zero callbacks
+        composeRule.runOnIdle {
+            state = state.copy(phase = LoanPhase.SENDING)
+        }
+        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Back to account").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.INCOME.path).performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performScrollTo().assertIsNotEnabled()
+
+        composeRule.onNodeWithText("Submit application").performScrollTo().performClick()
+        composeRule.onNodeWithText("Back to account").performScrollTo().performClick()
+        assertEquals(1, submitCount)
+        assertEquals(1, backCount)
+
+        // 4. RECEIPT: displays "Application submitted", "Reference: application-001", and "Back to account"; no submit control
+        composeRule.runOnIdle {
+            state = state.afterResult(LoanSubmitResult.Created("application-001"))
+        }
+        composeRule.onNodeWithText("Application submitted").assertIsDisplayed()
+        composeRule.onNodeWithText("Reference: application-001").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+        assertEquals(0, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+        assertEquals(1, submitCount)
+
+        composeRule.onNodeWithText("Back to account").performClick()
+        assertEquals(2, backCount)
+        assertEquals(1, submitCount)
+
+        // 5. UNCONFIRMED: displays uncertain write guidance and "Back to account" with zero submit callbacks
+        composeRule.runOnIdle {
+            state = state.afterResult(LoanSubmitResult.Unconfirmed)
+        }
+        composeRule.onNodeWithText(
+            "We couldn’t confirm submission. Ask your lender to check for an existing application before starting again."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+        assertEquals(0, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+
+        composeRule.onNodeWithText("Back to account").performClick()
+        assertEquals(3, backCount)
+        assertEquals(1, submitCount)
+
+        // 6. DENIED: displays state.notice and "Back to account" with no submit control
+        composeRule.runOnIdle {
+            state = state.afterResult(LoanSubmitResult.Forbidden)
+        }
+        composeRule.onNodeWithText("Borrower access is required.").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
+        assertEquals(0, composeRule.onAllNodesWithText("Submit application").fetchSemanticsNodes().size)
+
+        composeRule.onNodeWithText("Back to account").performClick()
+        assertEquals(4, backCount)
+        assertEquals(1, submitCount)
+        assertEquals(0, editCount)
+        assertEquals(0, debtCount)
     }
 }
