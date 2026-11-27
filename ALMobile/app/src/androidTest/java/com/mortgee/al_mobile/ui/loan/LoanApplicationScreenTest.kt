@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -113,8 +114,94 @@ class LoanApplicationScreenTest {
         composeRule.onNodeWithTag(LoanField.PRICE.path).assertIsNotEnabled()
 
         composeRule.onNodeWithText("No").performClick()
-        assertEquals( editsBeforeDisable, editCount)
+        assertEquals(editsBeforeDisable, editCount)
         assertEquals(choicesBeforeDisable, debtChoiceCount)
         assertEquals(true, draft.hasDebt)
+    }
+
+    @Test
+    fun propertyInputs() {
+        var draft by mutableStateOf(LoanDraft())
+        var errors by mutableStateOf(
+            mapOf(
+                LoanField.TYPE to "Property type is required",
+                LoanField.BER to "BER rating is required",
+            )
+        )
+        var enabled by mutableStateOf(true)
+        val callbackEvents = mutableListOf<Pair<LoanField, String>>()
+
+        composeRule.setContent {
+            LoanPropertyFields(
+                draft = draft,
+                errors = errors,
+                enabled = enabled,
+                onEdit = { field, text ->
+                    callbackEvents.add(field to text)
+                    draft = draft.edit(field, text)
+                    errors = errors - field
+                },
+            )
+        }
+
+        // Start with blank TYPE and BER; all seven property controls and selector errors are present
+        assertEquals("", draft[LoanField.TYPE])
+        assertEquals("", draft[LoanField.BER])
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.AREA.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.BEDS.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.BATHS.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.YEAR.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.TYPE.path).assertIsDisplayed()
+        composeRule.onNodeWithTag(LoanField.BER.path).assertIsDisplayed()
+        composeRule.onNodeWithText("Property type is required").assertIsDisplayed()
+        composeRule.onNodeWithText("BER rating is required").assertIsDisplayed()
+
+        // Choose TOWN_HOUSE from Property type dropdown -> callback emits "TOWN_HOUSE" and closes menu
+        composeRule.onNodeWithTag(LoanField.TYPE.path).performClick()
+        composeRule.onNodeWithText("TOWN_HOUSE").performClick()
+        assertEquals("TOWN_HOUSE", draft[LoanField.TYPE])
+        composeRule.onNodeWithTag(LoanField.TYPE.path).assertTextContains("TOWN_HOUSE")
+        assertEquals(0, composeRule.onAllNodesWithText("APARTMENT").fetchSemanticsNodes().size)
+
+        // Choose EXEMPT from BER rating dropdown -> callback emits "EXEMPT" and closes menu
+        composeRule.onNodeWithTag(LoanField.BER.path).performClick()
+        composeRule.onNodeWithText("EXEMPT").performClick()
+        assertEquals("EXEMPT", draft[LoanField.BER])
+        composeRule.onNodeWithTag(LoanField.BER.path).assertTextContains("EXEMPT")
+        assertEquals(0, composeRule.onAllNodesWithText("A1").fetchSemanticsNodes().size)
+
+        // Enter county, floor area, bedrooms "0", bathrooms "0", and year "2005"
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextInput("Kilkenny")
+        composeRule.onNodeWithTag(LoanField.AREA.path).performTextInput("115")
+        composeRule.onNodeWithTag(LoanField.BEDS.path).performTextInput("0")
+        composeRule.onNodeWithTag(LoanField.BATHS.path).performTextInput("0")
+        composeRule.onNodeWithTag(LoanField.YEAR.path).performTextInput("2005")
+
+        assertEquals("Kilkenny", draft[LoanField.COUNTY])
+        assertEquals("115", draft[LoanField.AREA])
+        assertEquals("0", draft[LoanField.BEDS])
+        assertEquals("0", draft[LoanField.BATHS])
+        assertEquals("2005", draft[LoanField.YEAR])
+        assertEquals("TOWN_HOUSE", draft[LoanField.TYPE])
+        assertEquals("EXEMPT", draft[LoanField.BER])
+
+        // Disable controls and verify no selection or edit is dispatched
+        val countBeforeDisable = callbackEvents.size
+        composeRule.runOnIdle {
+            enabled = false
+        }
+
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.AREA.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.BEDS.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.BATHS.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.YEAR.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.TYPE.path).assertIsNotEnabled()
+        composeRule.onNodeWithTag(LoanField.BER.path).assertIsNotEnabled()
+
+        composeRule.onNodeWithTag(LoanField.TYPE.path).performClick()
+        composeRule.onNodeWithTag(LoanField.BER.path).performClick()
+        assertEquals(countBeforeDisable, callbackEvents.size)
     }
 }

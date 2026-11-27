@@ -146,8 +146,8 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-15** | Apply form edits to the current open draft | `LA-14` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | **DONE** (`LoanApplicationViewModel.edit`, `LoanApplicationViewModel.chooseDebt`, `LoanApplicationViewModelTest.changeOnlyCurrentDraft`) |
 | **LA-16** | Guard double taps and late submission results | `LA-15` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | **DONE** (`LoanApplicationViewModel.submit`, `LoanApplicationViewModelTest.guardDoubleTapsAndLateSubmissionResults`) |
 | **LA-17** | Render the financial controls and reveal the debt amount | `LA-05` | `C LoanFinanceFields.kt`, `C LoanApplicationScreenTest.kt` | **DONE** (`LoanFinanceFields`, `LoanTextInput`, `LoanApplicationScreenTest.debtVisibility`) |
-| **LA-18** | Render the seven property controls with valid code choices | `LA-17` | `C LoanPropertyFields.kt`, `M LoanApplicationScreenTest.kt` | Ready now |
-| **LA-19** | Render editing, progress and the returned application reference | `LA-13`, `LA-18` | `C LoanApplicationScreen.kt`, `M LoanApplicationScreenTest.kt` | Pending |
+| **LA-18** | Render the seven property controls with valid code choices | `LA-17` | `C LoanPropertyFields.kt`, `M LoanApplicationScreenTest.kt` | **DONE** (`LoanPropertyFields`, `LoanApplicationScreenTest.propertyInputs`) |
+| **LA-19** | Render editing, progress and the returned application reference | `LA-13`, `LA-18` | `C LoanApplicationScreen.kt`, `M LoanApplicationScreenTest.kt` | Ready now |
 | **LA-20** | Add a borrower action to the existing landing screen | Ready now | `M AuthenticatedLandingScreen.kt`, `C LoanLandingActionTest.kt` | Ready now |
 | **LA-21** | Open and leave the form through the real authenticated landing | `LA-16`, `LA-19`, `LA-20` | `C LoanApplicationRoute.kt`, `M AuthenticatedLandingRoute.kt` | Pending |
 | **LA-22** | Verify the borrower journey and report the evidence | `LA-21` | Verification only (`testDebugUnitTest`, `assembleDebug`, `connectedDebugAndroidTest`, `pytest`) | Pending |
