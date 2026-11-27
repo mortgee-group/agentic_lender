@@ -2,6 +2,7 @@
 package com.mortgee.al_mobile.ui.loan
 
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.network.model.CreateLoanRequest
 import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
 import com.mortgee.al_mobile.ui.form.PropertyFormData
 import com.mortgee.al_mobile.ui.form.PropertyFormValidator
@@ -187,4 +188,32 @@ fun validateProperty(d: LoanDraft): Checked<LoanPropertyDto> {
         errors = emptyMap(),
     )
 }
+
+fun prepareLoan(d: LoanDraft): Checked<CreateLoanRequest> {
+    val finances = validateFinances(d)
+    val property = validateProperty(d)
+    val combined = linkedMapOf<LoanField, String>().apply {
+        putAll(finances.errors)
+        putAll(property.errors)
+    }
+
+    val f = finances.value
+    val p = property.value
+    if (combined.isNotEmpty() || f == null || p == null) {
+        return Checked(value = null, errors = combined)
+    }
+
+    return Checked(
+        value = CreateLoanRequest(
+            householdAnnualGrossIncome = f.income,
+            existingDebtLiabilities = f.debt,
+            deposit = f.deposit,
+            requestedMortgageTerm = f.term,
+            sellerAskingPrice = f.price,
+            property = p,
+        ),
+        errors = emptyMap(),
+    )
+}
+
 

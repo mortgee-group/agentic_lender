@@ -1,6 +1,7 @@
 package com.mortgee.al_mobile.ui.loan
 
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.network.model.CreateLoanRequest
 import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -238,5 +239,106 @@ class LoanValidationTest {
             emptyProperty.errors,
         )
     }
+
+    @Test
+    fun prepareRequest() {
+        val completeWithDebt = LoanDraft()
+            .edit(LoanField.INCOME, "75000")
+            .chooseDebt(true)
+            .edit(LoanField.DEBT, "10000")
+            .edit(LoanField.DEPOSIT, "70000")
+            .edit(LoanField.TERM, "30")
+            .edit(LoanField.PRICE, "350000")
+            .edit(LoanField.COUNTY, "Kilkenny")
+            .edit(LoanField.AREA, "115")
+            .edit(LoanField.BEDS, "3")
+            .edit(LoanField.BATHS, "2")
+            .edit(LoanField.YEAR, "2005")
+            .edit(LoanField.TYPE, "SEMI_DETACHED")
+            .edit(LoanField.BER, "B2")
+
+        val expectedProperty = LoanPropertyDto(
+            county = "Kilkenny",
+            floorArea = 115.0,
+            bedrooms = 3,
+            bathrooms = 2,
+            yearBuilt = 2005,
+            propertyType = "SEMI_DETACHED",
+            berRating = "B2",
+        )
+
+        val checkedWithDebt = prepareLoan(completeWithDebt)
+        assertEquals(
+            CreateLoanRequest(
+                householdAnnualGrossIncome = 75000.0,
+                existingDebtLiabilities = 10000.0,
+                deposit = 70000.0,
+                requestedMortgageTerm = 30,
+                sellerAskingPrice = 350000.0,
+                property = expectedProperty,
+            ),
+            checkedWithDebt.value,
+        )
+        assertTrue(checkedWithDebt.errors.isEmpty())
+
+        val completeNoDebt = completeWithDebt.chooseDebt(false)
+        val checkedNoDebt = prepareLoan(completeNoDebt)
+        assertEquals(
+            CreateLoanRequest(
+                householdAnnualGrossIncome = 75000.0,
+                existingDebtLiabilities = 0.0,
+                deposit = 70000.0,
+                requestedMortgageTerm = 30,
+                sellerAskingPrice = 350000.0,
+                property = expectedProperty,
+            ),
+            checkedNoDebt.value,
+        )
+        assertTrue(checkedNoDebt.errors.isEmpty())
+
+        val fourAffordabilityAlone = LoanDraft()
+            .edit(LoanField.INCOME, "75000")
+            .chooseDebt(true)
+            .edit(LoanField.DEBT, "10000")
+            .edit(LoanField.DEPOSIT, "70000")
+            .edit(LoanField.TERM, "30")
+        val checkedFourOnly = prepareLoan(fourAffordabilityAlone)
+        assertNull(checkedFourOnly.value)
+        assertEquals(
+            mapOf(
+                LoanField.PRICE to "Enter an asking price greater than zero.",
+                LoanField.COUNTY to "Enter the county.",
+                LoanField.AREA to "Property size is required",
+                LoanField.BEDS to "Number of bedrooms is required",
+                LoanField.BATHS to "Enter zero or more whole bathrooms.",
+                LoanField.YEAR to "Enter a build year from 1800 to 2030.",
+                LoanField.TYPE to "Property type is required",
+                LoanField.BER to "Choose a BER rating.",
+            ),
+            checkedFourOnly.errors,
+        )
+
+        val missingYearAndBadTerm = completeWithDebt
+            .edit(LoanField.TERM, "41")
+            .edit(LoanField.YEAR, "")
+        val checkedBothSectionsInvalid = prepareLoan(missingYearAndBadTerm)
+        assertNull(checkedBothSectionsInvalid.value)
+        assertEquals(
+            mapOf(
+                LoanField.TERM to "Enter a whole number from 1 to 40.",
+                LoanField.YEAR to "Enter a build year from 1800 to 2030.",
+            ),
+            checkedBothSectionsInvalid.errors,
+        )
+
+        val depositEqualsPrice = completeWithDebt.edit(LoanField.DEPOSIT, "350000")
+        val checkedDepositEqualsPrice = prepareLoan(depositEqualsPrice)
+        assertNull(checkedDepositEqualsPrice.value)
+        assertEquals(
+            mapOf(LoanField.DEPOSIT to "Deposit must be less than the asking price."),
+            checkedDepositEqualsPrice.errors,
+        )
+    }
 }
+
 

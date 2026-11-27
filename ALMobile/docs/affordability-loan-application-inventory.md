@@ -137,7 +137,7 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-06** | Parse money without silently changing the entered amount | Ready now | `C LoanValidation.kt`, `C LoanValidationTest.kt` | **DONE** (`loanMoney`, `LoanValidationTest.moneyParsing`) |
 | **LA-07** | Validate the five financial values together | `LA-05`, `LA-06` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`Checked`, `LoanFinances`, `validateFinances`, `LoanValidationTest.financeRules`) |
 | **LA-08** | Validate the complete ALCore property | `LA-07`, `LA-01` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`validateProperty`, `LoanValidationTest.propertyRules`) |
-| **LA-09** | Build a POST body only from a complete draft | `LA-08`, `LA-02` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Ready now |
+| **LA-09** | Build a POST body only from a complete draft | `LA-08`, `LA-02` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`prepareLoan`, `LoanValidationTest.prepareRequest`) |
 | **LA-10** | Map FastAPI validation errors to form fields | `LA-02`, `LA-05` | `C LoanApplicationRepository.kt`, `C LoanHttpErrors.kt`, `C LoanHttpErrorsTest.kt` | Ready now |
 | **LA-11** | Distinguish confirmed rejections from an uncertain write | `LA-10` | `M LoanHttpErrors.kt`, `M LoanHttpErrorsTest.kt` | Pending |
 | **LA-12** | Submit once with the original borrower's session key | `LA-04`, `LA-11` | `C ApiLoanApplicationRepository.kt`, `C ApiLoanApplicationRepositoryTest.kt` | Pending (`LA-11` prerequisite) |
