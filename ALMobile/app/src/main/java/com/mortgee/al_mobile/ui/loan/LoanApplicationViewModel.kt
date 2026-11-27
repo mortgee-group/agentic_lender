@@ -107,4 +107,20 @@ class LoanApplicationViewModel internal constructor(
             notice = null,
         )
     }
+
+    fun submit(key: SessionKey) {
+        val s = _state.value
+        if (!isCurrent(key) || s.owner != key || !s.canSubmit) {
+            return
+        }
+        val request = prepareLoan(s.draft).value ?: return
+        _state.value = s.copy(phase = LoanPhase.SENDING, notice = null)
+        viewModelScope.launch {
+            val outcome = repo.submit(key, request)
+            val latest = _state.value
+            if (isCurrent(key) && latest.owner == key && latest.phase == LoanPhase.SENDING) {
+                _state.value = latest.afterResult(outcome)
+            }
+        }
+    }
 }

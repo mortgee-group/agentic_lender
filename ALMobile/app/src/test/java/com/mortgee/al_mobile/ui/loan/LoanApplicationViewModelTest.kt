@@ -2,10 +2,12 @@ package com.mortgee.al_mobile.ui.loan
 
 import com.mortgee.al_mobile.data.model.BackendRole
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.network.model.CreateLoanRequest
 import com.mortgee.al_mobile.data.repository.LoanApplicationRepository
 import com.mortgee.al_mobile.data.repository.LoanSubmitResult
 import com.mortgee.al_mobile.data.session.SessionKey
 import com.mortgee.al_mobile.data.session.SessionState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +19,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -210,6 +213,147 @@ class LoanApplicationViewModelTest {
         assertEquals(LoanDraft(), viewModel.state.value.draft)
 
         assertEquals(0, submitCalls)
+    }
+
+    @Test
+    fun guardDoubleTapsAndLateSubmissionResults() = runTest(testDispatcher) {
+        val borrowerA2 = SessionKey(uid = "borrower-a", generation = 2L)
+        val borrowerA3 = SessionKey(uid = "borrower-a", generation = 3L)
+
+        val pendingOutcomes = ArrayDeque<CompletableDeferred<LoanSubmitResult>>()
+        val capturedCalls = mutableListOf<Pair<SessionKey, CreateLoanRequest>>()
+        val repo = LoanApplicationRepository { key, request ->
+            val deferred = CompletableDeferred<LoanSubmitResult>()
+            capturedCalls += key to request
+            pendingOutcomes.addLast(deferred)
+            deferred.await()
+        }
+
+        val sessions = MutableStateFlow<SessionState>(
+            authenticatedSession(borrowerA2, BackendRole.BORROWER),
+        )
+        val viewModel = LoanApplicationViewModel(repo = repo, sessions = sessions)
+        runCurrent()
+
+        viewModel.open(borrowerA2)
+
+        // Invalid or incomplete draft -> zero calls
+        viewModel.submit(borrowerA2)
+        runCurrent()
+        assertEquals(0, capturedCalls.size)
+        assertEquals(LoanPhase.EDITING, viewModel.state.value.phase)
+
+        // Populate complete valid draft for A/2
+        fillValidDraft(viewModel, borrowerA2)
+        assertTrue(viewModel.state.value.canSubmit)
+
+        // Two taps on a complete A/2 draft during one suspended call -> one request
+        viewModel.submit(borrowerA2)
+        viewModel.submit(borrowerA2)
+        runCurrent()
+
+        assertEquals(1, capturedCalls.size)
+        assertEquals(borrowerA2, capturedCalls.single().first)
+        assertEquals(LoanPhase.SENDING, viewModel.state.value.phase)
+        assertFalse(viewModel.state.value.canSubmit)
+
+        // UI close while SENDING is guarded
+        viewModel.close(borrowerA2)
+        assertEquals(LoanPhase.SENDING, viewModel.state.value.phase)
+
+        // Switch to same-UID new generation A/3, open and edit a fresh draft
+        val firstAttempt = pendingOutcomes.removeFirst()
+        sessions.value = authenticatedSession(borrowerA3, BackendRole.BORROWER)
+        runCurrent()
+        assertEquals(LoanPhase.CLOSED, viewModel.state.value.phase)
+
+        viewModel.open(borrowerA3)
+        viewModel.edit(borrowerA3, LoanField.INCOME, "82000")
+        val a3DraftBeforeCompletion = viewModel.state.value.draft
+
+        // Complete A/2 with Created("old-id") -> A/3 keeps its draft and has no receipt/error
+        firstAttempt.complete(LoanSubmitResult.Created("old-id"))
+        runCurrent()
+        assertEquals(LoanPhase.EDITING, viewModel.state.value.phase)
+        assertEquals(borrowerA3, viewModel.state.value.owner)
+        assertEquals(a3DraftBeforeCompletion, viewModel.state.value.draft)
+        assertNull(viewModel.state.value.receiptId)
+        assertTrue(viewModel.state.value.serverFields.isEmpty())
+
+        // Repeat stale completion check when A/2 completes with Invalid({YEAR}, false)
+        sessions.value = authenticatedSession(borrowerA2, BackendRole.BORROWER)
+        runCurrent()
+        viewModel.open(borrowerA2)
+        fillValidDraft(viewModel, borrowerA2)
+        viewModel.submit(borrowerA2)
+        runCurrent()
+        assertEquals(2, capturedCalls.size)
+        val secondAttempt = pendingOutcomes.removeFirst()
+
+        sessions.value = authenticatedSession(borrowerA3, BackendRole.BORROWER)
+        runCurrent()
+        viewModel.open(borrowerA3)
+        viewModel.edit(borrowerA3, LoanField.COUNTY, "Cork")
+        val a3DraftBeforeInvalidCompletion = viewModel.state.value.draft
+
+        secondAttempt.complete(
+            LoanSubmitResult.Invalid(fields = setOf(LoanField.YEAR), other = false),
+        )
+        runCurrent()
+        assertEquals(LoanPhase.EDITING, viewModel.state.value.phase)
+        assertEquals(borrowerA3, viewModel.state.value.owner)
+        assertEquals(a3DraftBeforeInvalidCompletion, viewModel.state.value.draft)
+        assertNull(viewModel.state.value.receiptId)
+        assertTrue(viewModel.state.value.serverFields.isEmpty())
+        assertNull(viewModel.state.value.notice)
+
+        // Complete valid draft under A/3: NoBroker returns to EDITING; only a new explicit tap sends a second call
+        fillValidDraft(viewModel, borrowerA3)
+        viewModel.submit(borrowerA3)
+        runCurrent()
+        assertEquals(3, capturedCalls.size)
+        assertEquals(borrowerA3, capturedCalls.last().first)
+
+        pendingOutcomes.removeFirst().complete(LoanSubmitResult.NoBroker)
+        runCurrent()
+        assertEquals(LoanPhase.EDITING, viewModel.state.value.phase)
+        assertEquals(borrowerA3, viewModel.state.value.owner)
+        assertNotNull(viewModel.state.value.notice)
+        assertTrue(viewModel.state.value.canSubmit)
+        // No automatic retry occurred
+        assertEquals(3, capturedCalls.size)
+
+        // Explicit retry tap sends the second call for A/3 and transitions to RECEIPT on Created
+        viewModel.submit(borrowerA3)
+        runCurrent()
+        assertEquals(4, capturedCalls.size)
+        assertEquals(borrowerA3, capturedCalls.last().first)
+        assertEquals(LoanPhase.SENDING, viewModel.state.value.phase)
+        assertNull(viewModel.state.value.notice)
+
+        pendingOutcomes.removeFirst().complete(LoanSubmitResult.Created("app-a3-001"))
+        runCurrent()
+        assertEquals(LoanPhase.RECEIPT, viewModel.state.value.phase)
+        assertEquals(borrowerA3, viewModel.state.value.owner)
+        assertEquals("app-a3-001", viewModel.state.value.receiptId)
+    }
+
+    private fun fillValidDraft(
+        viewModel: LoanApplicationViewModel,
+        key: SessionKey,
+    ) {
+        viewModel.edit(key, LoanField.INCOME, "75000")
+        viewModel.chooseDebt(key, false)
+        viewModel.edit(key, LoanField.DEPOSIT, "70000")
+        viewModel.edit(key, LoanField.TERM, "30")
+        viewModel.edit(key, LoanField.PRICE, "350000")
+        viewModel.edit(key, LoanField.COUNTY, "Kilkenny")
+        viewModel.edit(key, LoanField.AREA, "115")
+        viewModel.edit(key, LoanField.BEDS, "3")
+        viewModel.edit(key, LoanField.BATHS, "2")
+        viewModel.edit(key, LoanField.YEAR, "2005")
+        viewModel.edit(key, LoanField.TYPE, "SEMI_DETACHED")
+        viewModel.edit(key, LoanField.BER, "B2")
     }
 
     private fun authenticatedSession(
