@@ -132,7 +132,7 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-01** | Encode the seven property fields | Ready now | `C LoanApplicationDtos.kt`, `C LoanApplicationDtosTest.kt` | **DONE** (`LoanPropertyDto`, `LoanApplicationDtosTest.propertyKeys`) |
 | **LA-02** | Encode a create request and decode its receipt | `LA-01` | `M LoanApplicationDtos.kt`, `M LoanApplicationDtosTest.kt` | **DONE** (`CreateLoanRequest`, `CreateLoanReceipt`, `LoanApplicationDtosTest.createContract`) |
 | **LA-03** | Send the create call to the existing HTTP route | `LA-02` | `C LoanApplicationApi.kt`, `C LoanApplicationApiTest.kt` | **DONE** (`LoanApplicationApi`, `LoanApplicationApiTest.createWire`) |
-| **LA-04** | Give the create operation a single-use HTTP body | `LA-03` | `M NetworkModule.kt`, `M LoanApplicationApiTest.kt` | Ready now |
+| **LA-04** | Give the create operation a single-use HTTP body | `LA-03` | `M NetworkModule.kt`, `M LoanApplicationApiTest.kt` | **DONE** (`NetworkModule.provideLoanApplicationApi`, `LoanApplicationApiTest`) |
 | **LA-05** | Keep an explicit debt choice and discard hidden debt input | Ready now | `C LoanField.kt`, `C LoanDraft.kt`, `C LoanDraftTest.kt` | Ready now |
 | **LA-06** | Parse money without silently changing the entered amount | Ready now | `C LoanValidation.kt`, `C LoanValidationTest.kt` | Ready now |
 | **LA-07** | Validate the five financial values together | `LA-05`, `LA-06` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Pending |
@@ -140,7 +140,7 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-09** | Build a POST body only from a complete draft | `LA-08`, `LA-02` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | Pending |
 | **LA-10** | Map FastAPI validation errors to form fields | `LA-02`, `LA-05` | `C LoanApplicationRepository.kt`, `C LoanHttpErrors.kt`, `C LoanHttpErrorsTest.kt` | Pending |
 | **LA-11** | Distinguish confirmed rejections from an uncertain write | `LA-10` | `M LoanHttpErrors.kt`, `M LoanHttpErrorsTest.kt` | Pending |
-| **LA-12** | Submit once with the original borrower's session key | `LA-04`, `LA-11` | `C ApiLoanApplicationRepository.kt`, `C ApiLoanApplicationRepositoryTest.kt` | Pending |
+| **LA-12** | Submit once with the original borrower's session key | `LA-04`, `LA-11` | `C ApiLoanApplicationRepository.kt`, `C ApiLoanApplicationRepositoryTest.kt` | Pending (`LA-11` prerequisite) |
 | **LA-13** | Turn a submission outcome into form or receipt state | `LA-09`, `LA-10` | `C LoanUiState.kt`, `C LoanUiStateTest.kt` | Pending |
 | **LA-14** | Retain one draft for the active borrower | `LA-12`, `LA-13` | `C LoanApplicationViewModel.kt`, `M RepositoryModule.kt`, `C LoanApplicationViewModelTest.kt` | Pending |
 | **LA-15** | Apply form edits to the current open draft | `LA-14` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Pending |

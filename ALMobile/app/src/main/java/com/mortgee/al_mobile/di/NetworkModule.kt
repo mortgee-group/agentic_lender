@@ -14,10 +14,13 @@ import javax.inject.Singleton
 import com.mortgee.al_mobile.data.auth.AuthAdapter
 import com.mortgee.al_mobile.data.network.CatalogueApiService
 import com.mortgee.al_mobile.data.network.DefaultPrivateTokenSeam
+import com.mortgee.al_mobile.data.network.LoanApplicationApi
 import com.mortgee.al_mobile.data.network.PrivateRequestInterceptor
 import com.mortgee.al_mobile.data.network.PrivateTokenSeam
 import com.mortgee.al_mobile.data.network.ProfileApiService
 import com.mortgee.al_mobile.data.session.SessionOwner
+import okhttp3.RequestBody
+import okio.BufferedSink
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -91,5 +94,38 @@ object NetworkModule {
         retrofit: Retrofit
     ): ProfileApiService {
         return retrofit.create(ProfileApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLoanApplicationApi(
+        retrofit: Retrofit,
+        okHttpClient: OkHttpClient,
+    ): LoanApplicationApi {
+        val derived = okHttpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .addInterceptor { chain ->
+                val r = chain.request()
+                val b = r.body
+                if (b == null) {
+                    chain.proceed(r)
+                } else {
+                    val wrapped = object : RequestBody() {
+                        override fun contentType() = b.contentType()
+                        override fun contentLength() = b.contentLength()
+                        override fun writeTo(sink: BufferedSink) = b.writeTo(sink)
+                        override fun isOneShot() = true
+                    }
+                    chain.proceed(r.newBuilder().method(r.method, wrapped).build())
+                }
+            }
+            .build()
+
+        return retrofit.newBuilder()
+            .client(derived)
+            .build()
+            .create(LoanApplicationApi::class.java)
     }
 }

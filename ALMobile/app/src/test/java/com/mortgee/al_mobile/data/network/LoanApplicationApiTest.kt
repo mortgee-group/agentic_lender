@@ -4,12 +4,16 @@ import com.mortgee.al_mobile.data.network.model.CreateLoanReceipt
 import com.mortgee.al_mobile.data.network.model.CreateLoanRequest
 import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
 import com.mortgee.al_mobile.di.NetworkModule
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -72,6 +76,102 @@ class LoanApplicationApiTest {
         } finally {
             server.shutdown()
         }
+    }
+
+    @Test
+    fun redirectNotFollowed() = runTest {
+        val primary = MockWebServer()
+        val secondary = MockWebServer()
+        primary.start()
+        secondary.start()
+        try {
+            val api = providedApi(primary)
+            primary.enqueue(
+                MockResponse()
+                    .setResponseCode(307)
+                    .addHeader("Location", secondary.url("/applications").toString()),
+            )
+            enqueueSpareSuccess(primary)
+            enqueueSpareSuccess(secondary)
+
+            val response = api.create("Bearer fixture-token", completeRequest())
+
+            assertEquals(307, response.code())
+            assertEquals(1, primary.requestCount)
+            assertEquals(0, secondary.requestCount)
+        } finally {
+            primary.shutdown()
+            secondary.shutdown()
+        }
+    }
+
+    @Test
+    fun retryAfter503NotRetried() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val api = providedApi(server)
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(503)
+                    .addHeader("Retry-After", "0")
+                    .setBody("""{"detail":"No brokers are currently available"}"""),
+            )
+            enqueueSpareSuccess(server)
+
+            val response = api.create("Bearer fixture-token", completeRequest())
+
+            assertEquals(503, response.code())
+            assertEquals(1, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun disconnectAfterRequestDoesNotRetransmit() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val api = providedApi(server)
+            server.enqueue(
+                MockResponse()
+                    .setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST),
+            )
+            enqueueSpareSuccess(server)
+
+            try {
+                api.create("Bearer fixture-token", completeRequest())
+                fail("Expected IOException on disconnected response")
+            } catch (_: IOException) {
+                // Expected transport failure
+            }
+
+            assertEquals(1, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    private fun providedApi(server: MockWebServer): LoanApplicationApi {
+        val moshi = NetworkModule.provideMoshi()
+        val localClient = OkHttpClient.Builder().build()
+        val retrofit = Retrofit.Builder()
+            .baseUrl(server.url("/"))
+            .client(localClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+        return NetworkModule.provideLoanApplicationApi(retrofit, localClient)
+    }
+
+    private fun enqueueSpareSuccess(server: MockWebServer) {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(201)
+                .setBody(
+                    """{"applicationId":"spare-001","message":"Mortgage application created successfully"}""",
+                ),
+        )
     }
 
     private fun completeRequest(): CreateLoanRequest = CreateLoanRequest(
