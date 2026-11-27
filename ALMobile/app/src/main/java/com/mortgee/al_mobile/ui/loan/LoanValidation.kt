@@ -2,6 +2,9 @@
 package com.mortgee.al_mobile.ui.loan
 
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
+import com.mortgee.al_mobile.ui.form.PropertyFormData
+import com.mortgee.al_mobile.ui.form.PropertyFormValidator
 import java.math.BigDecimal
 
 private val LOAN_MONEY_REGEX = Regex("[0-9]+(?:[.][0-9]{1,2})?")
@@ -12,6 +15,10 @@ private const val DEBT_CHOICE_ERROR = "Choose Yes or No."
 private const val TERM_ERROR = "Enter a whole number from 1 to 40."
 private const val PRICE_ERROR = "Enter an asking price greater than zero."
 private const val DEPOSIT_PRICE_ERROR = "Deposit must be less than the asking price."
+private const val COUNTY_ERROR = "Enter the county."
+private const val BATHS_ERROR = "Enter zero or more whole bathrooms."
+private const val YEAR_ERROR = "Enter a build year from 1800 to 2030."
+private const val BER_REQUIRED_ERROR = "Choose a BER rating."
 
 data class Checked<T>(
     val value: T?,
@@ -100,6 +107,82 @@ fun validateFinances(d: LoanDraft): Checked<LoanFinances> {
             deposit = deposit,
             term = term,
             price = price,
+        ),
+        errors = emptyMap(),
+    )
+}
+
+fun validateProperty(d: LoanDraft): Checked<LoanPropertyDto> {
+    val base = PropertyFormValidator.validate(
+        PropertyFormData(
+            locationInput = d[LoanField.COUNTY],
+            sizeSqmInput = d[LoanField.AREA],
+            bedroomsInput = d[LoanField.BEDS],
+            propertyTypeInput = d[LoanField.TYPE],
+            berRatingInput = d[LoanField.BER],
+        ),
+    )
+
+    val errors = linkedMapOf<LoanField, String>()
+
+    val county = base.parsedLocation
+    if (!base.isLocationValid || county == null) {
+        errors[LoanField.COUNTY] = COUNTY_ERROR
+    }
+
+    val area = base.parsedSizeSqm
+    if (!base.isSizeValid || area == null) {
+        errors[LoanField.AREA] = base.sizeError ?: "Property size is required"
+    }
+
+    val bedrooms = base.parsedBedrooms
+    if (!base.isBedroomsValid || bedrooms == null) {
+        errors[LoanField.BEDS] = base.bedroomsError ?: "Number of bedrooms is required"
+    }
+
+    val bathrooms = d[LoanField.BATHS].trim().toIntOrNull()?.takeIf { it >= 0 }
+    if (bathrooms == null) {
+        errors[LoanField.BATHS] = BATHS_ERROR
+    }
+
+    val yearBuilt = d[LoanField.YEAR].trim().toIntOrNull()?.takeIf { it in 1800..2030 }
+    if (yearBuilt == null) {
+        errors[LoanField.YEAR] = YEAR_ERROR
+    }
+
+    val propertyType = base.parsedPropertyType
+    if (!base.isPropertyTypeValid || propertyType == null) {
+        errors[LoanField.TYPE] = base.propertyTypeError ?: "Property type is required"
+    }
+
+    val berRating = base.parsedBerRating
+    val berError = base.berRatingError ?: if (berRating == null) BER_REQUIRED_ERROR else null
+    if (berError != null) {
+        errors[LoanField.BER] = berError
+    }
+
+    if (
+        errors.isNotEmpty() ||
+        county == null ||
+        area == null ||
+        bedrooms == null ||
+        bathrooms == null ||
+        yearBuilt == null ||
+        propertyType == null ||
+        berRating == null
+    ) {
+        return Checked(value = null, errors = errors)
+    }
+
+    return Checked(
+        value = LoanPropertyDto(
+            county = county,
+            floorArea = area,
+            bedrooms = bedrooms,
+            bathrooms = bathrooms,
+            yearBuilt = yearBuilt,
+            propertyType = propertyType,
+            berRating = berRating,
         ),
         errors = emptyMap(),
     )

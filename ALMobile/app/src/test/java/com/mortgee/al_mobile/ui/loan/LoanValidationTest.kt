@@ -1,6 +1,7 @@
 package com.mortgee.al_mobile.ui.loan
 
 import com.mortgee.al_mobile.data.model.LoanField
+import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -119,6 +120,122 @@ class LoanValidationTest {
                 LoanField.PRICE to "Enter an asking price greater than zero.",
             ),
             emptyDraft.errors,
+        )
+    }
+
+    @Test
+    fun propertyRules() {
+        val validStudio = LoanDraft()
+            .edit(LoanField.COUNTY, " Kilkenny ")
+            .edit(LoanField.AREA, "115")
+            .edit(LoanField.BEDS, "0")
+            .edit(LoanField.BATHS, "0")
+            .edit(LoanField.YEAR, "1800")
+            .edit(LoanField.TYPE, "semi_detached")
+            .edit(LoanField.BER, "exempt")
+
+        val checkedStudio = validateProperty(validStudio)
+        assertEquals(
+            LoanPropertyDto(
+                county = "Kilkenny",
+                floorArea = 115.0,
+                bedrooms = 0,
+                bathrooms = 0,
+                yearBuilt = 1800,
+                propertyType = "SEMI_DETACHED",
+                berRating = "EXEMPT",
+            ),
+            checkedStudio.value,
+        )
+        assertTrue(checkedStudio.errors.isEmpty())
+
+        val year2030 = validateProperty(
+            validStudio
+                .edit(LoanField.BEDS, "3")
+                .edit(LoanField.BATHS, "2")
+                .edit(LoanField.YEAR, "2030")
+                .edit(LoanField.BER, "B2"),
+        )
+        assertEquals(
+            LoanPropertyDto(
+                county = "Kilkenny",
+                floorArea = 115.0,
+                bedrooms = 3,
+                bathrooms = 2,
+                yearBuilt = 2030,
+                propertyType = "SEMI_DETACHED",
+                berRating = "B2",
+            ),
+            year2030.value,
+        )
+        assertTrue(year2030.errors.isEmpty())
+
+        for (badYear in listOf("1799", "2031", "", "abc")) {
+            val res = validateProperty(validStudio.edit(LoanField.YEAR, badYear))
+            assertNull(res.value)
+            assertEquals(
+                mapOf(LoanField.YEAR to "Enter a build year from 1800 to 2030."),
+                res.errors,
+            )
+        }
+
+        for (badBaths in listOf("-1", "1.5", "", "two")) {
+            val res = validateProperty(validStudio.edit(LoanField.BATHS, badBaths))
+            assertNull(res.value)
+            assertEquals(
+                mapOf(LoanField.BATHS to "Enter zero or more whole bathrooms."),
+                res.errors,
+            )
+        }
+
+        val blankBer = validateProperty(validStudio.edit(LoanField.BER, "   "))
+        assertNull(blankBer.value)
+        assertEquals(
+            mapOf(LoanField.BER to "Choose a BER rating."),
+            blankBer.errors,
+        )
+
+        val unknownBer = validateProperty(validStudio.edit(LoanField.BER, "Z9"))
+        assertNull(unknownBer.value)
+        assertEquals(
+            mapOf(LoanField.BER to "Unsupported BER rating code"),
+            unknownBer.errors,
+        )
+
+        val unknownType = validateProperty(validStudio.edit(LoanField.TYPE, "CASTLE"))
+        assertNull(unknownType.value)
+        assertEquals(
+            mapOf(LoanField.TYPE to "Unsupported property type code"),
+            unknownType.errors,
+        )
+
+        val zeroArea = validateProperty(validStudio.edit(LoanField.AREA, "0"))
+        assertNull(zeroArea.value)
+        assertEquals(
+            mapOf(LoanField.AREA to "Size must be a positive number in square metres"),
+            zeroArea.errors,
+        )
+
+        val negativeBeds = validateProperty(validStudio.edit(LoanField.BEDS, "-1"))
+        assertNull(negativeBeds.value)
+        assertEquals(
+            mapOf(LoanField.BEDS to "Bedrooms must be 0 (for Studio) or a positive whole number"),
+            negativeBeds.errors,
+        )
+
+        val emptyProperty = validateProperty(LoanDraft())
+        assertNull(emptyProperty.value)
+        assertEquals(
+            mapOf(
+                LoanField.COUNTY to "Enter the county.",
+                LoanField.AREA to "Property size is required",
+                LoanField.BEDS to "Number of bedrooms is required",
+                LoanField.BATHS to "Enter zero or more whole bathrooms.",
+                LoanField.YEAR to "Enter a build year from 1800 to 2030.",
+                LoanField.TYPE to "Property type is required",
+                LoanField.BER to "Choose a BER rating.",
+            ),
+            emptyProperty.errors,
         )
     }
 }
