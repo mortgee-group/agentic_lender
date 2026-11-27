@@ -143,8 +143,8 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-12** | Submit once with the original borrower's session key | `LA-04`, `LA-11` | `C ApiLoanApplicationRepository.kt`, `C ApiLoanApplicationRepositoryTest.kt` | **DONE** (`ApiLoanApplicationRepository`, `ApiLoanApplicationRepositoryTest`) |
 | **LA-13** | Turn a submission outcome into form or receipt state | `LA-09`, `LA-10` | `C LoanUiState.kt`, `C LoanUiStateTest.kt` | **DONE** (`LoanPhase`, `LoanUiState`, `afterResult`, `LoanUiStateTest`) |
 | **LA-14** | Retain one draft for the active borrower | `LA-12`, `LA-13` | `C LoanApplicationViewModel.kt`, `M RepositoryModule.kt`, `C LoanApplicationViewModelTest.kt` | **DONE** (`LoanApplicationViewModel`, `RepositoryModule.bindLoanApplicationRepository`, `LoanApplicationViewModelTest.sessionOwnsDraft`) |
-| **LA-15** | Apply form edits to the current open draft | `LA-14` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Ready now |
-| **LA-16** | Guard double taps and late submission results | `LA-15` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Pending |
+| **LA-15** | Apply form edits to the current open draft | `LA-14` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | **DONE** (`LoanApplicationViewModel.edit`, `LoanApplicationViewModel.chooseDebt`, `LoanApplicationViewModelTest.changeOnlyCurrentDraft`) |
+| **LA-16** | Guard double taps and late submission results | `LA-15` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Ready now |
 | **LA-17** | Render the financial controls and reveal the debt amount | `LA-05` | `C LoanFinanceFields.kt`, `C LoanApplicationScreenTest.kt` | Ready now |
 | **LA-18** | Render the seven property controls with valid code choices | `LA-17` | `C LoanPropertyFields.kt`, `M LoanApplicationScreenTest.kt` | Pending |
 | **LA-19** | Render editing, progress and the returned application reference | `LA-13`, `LA-18` | `C LoanApplicationScreen.kt`, `M LoanApplicationScreenTest.kt` | Pending |

@@ -3,6 +3,7 @@ package com.mortgee.al_mobile.ui.loan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mortgee.al_mobile.data.model.BackendRole
+import com.mortgee.al_mobile.data.model.LoanField
 import com.mortgee.al_mobile.data.repository.LoanApplicationRepository
 import com.mortgee.al_mobile.data.session.SessionKey
 import com.mortgee.al_mobile.data.session.SessionOwner
@@ -69,5 +70,41 @@ class LoanApplicationViewModel internal constructor(
             return
         }
         _state.value = LoanUiState()
+    }
+
+    fun edit(key: SessionKey, f: LoanField, text: String) {
+        val current = _state.value
+        if (!isCurrent(key) || current.owner != key || current.phase != LoanPhase.EDITING) {
+            return
+        }
+        if (f == LoanField.DEBT && current.draft.hasDebt != true) {
+            return
+        }
+        val clearedServerFields = if (f == LoanField.PRICE) {
+            current.serverFields - LoanField.PRICE - LoanField.DEPOSIT
+        } else {
+            current.serverFields - f
+        }
+        _state.value = current.copy(
+            draft = current.draft.edit(f, text),
+            touched = current.touched + f,
+            serverFields = clearedServerFields,
+            serverOther = false,
+            notice = null,
+        )
+    }
+
+    fun chooseDebt(key: SessionKey, yes: Boolean) {
+        val current = _state.value
+        if (!isCurrent(key) || current.owner != key || current.phase != LoanPhase.EDITING) {
+            return
+        }
+        _state.value = current.copy(
+            draft = current.draft.chooseDebt(yes),
+            touched = current.touched + LoanField.DEBT,
+            serverFields = current.serverFields - LoanField.DEBT,
+            serverOther = false,
+            notice = null,
+        )
     }
 }
