@@ -17,8 +17,8 @@ This document catalogs the reusable components, modified files, new production a
 - **C (Create)**: New production or test file created in `ALMobile`.
 - **D (Delete)**: None (`0` files deleted).
 
-| Action | Production Files | Test Files | Total |
-|---|---:|---:|---:|
+| Action &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Production Files | Test Files | Total |
+| :--- | ---: | ---: | ---: |
 | **R · Reuse (Read-Only)** | 20 | 7 | 27 |
 | **M · Modify** | 4 | 0 | 4 |
 | **C · Create** | 14 | 10 | 24 |
@@ -30,8 +30,8 @@ This document catalogs the reusable components, modified files, new production a
 
 ### 3.1 Android Production Components (`ALMobile`)
 
-| Symbol / Component | Action | File Path | Reusable Capability / Role |
-|---|---|---|---|
+| Symbol / Component &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Action | File Path | Reusable Capability / Role |
+| :--- | :--- | :--- | :--- |
 | `MainActivity` | **R** | `app/src/main/java/com/mortgee/al_mobile/MainActivity.kt` | Hosts `AppNavigation` and observes session infrastructure. |
 | `AppNavigation` | **R** | `app/src/main/java/com/mortgee/al_mobile/ui/navigation/AppNavigation.kt` | Renders `AuthenticatedLandingRoute` scoped inside `key(authenticatedState.key)`. |
 | `NavigationConfig` | **R** | `app/src/main/java/com/mortgee/al_mobile/ui/navigation/NavigationConfig.kt` | Maps `BORROWER`, `BROKER`, and `UNDERWRITER` via `getDestinationForRole` to `AuthenticatedLanding`. |
@@ -55,8 +55,8 @@ This document catalogs the reusable components, modified files, new production a
 
 ### 3.2 Reusable Test Patterns & References (`ALMobile`)
 
-| Test File | Action | File Path | Reusable Pattern |
-|---|---|---|---|
+| Test File &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Action | File Path | Reusable Pattern |
+| :--- | :--- | :--- | :--- |
 | `ProfileApiServiceTest` | **R** | `app/src/test/java/com/mortgee/al_mobile/data/network/ProfileApiServiceTest.kt` | `MockWebServer`, `Retrofit.Builder`, and `MoshiConverterFactory` transport test setup. |
 | `PrivateTokenSeamTest` | **R** | `app/src/test/java/com/mortgee/al_mobile/data/network/PrivateTokenSeamTest.kt` | Regression suite for mutation `401` invalidation and stale session generation checks. |
 | `PropertyFormValidatorTest` | **R** | `app/src/test/java/com/mortgee/al_mobile/ui/form/PropertyFormValidatorTest.kt` | Existing validation tests (including studio `0` bedrooms and optional BER in general form). |
@@ -66,8 +66,8 @@ This document catalogs the reusable components, modified files, new production a
 
 ### 3.3 Backend Contract References (`ALCore`)
 
-| Backend File | Action | Role in Contract Verification |
-|---|---|---|
+| Backend File &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Action | Role in Contract Verification |
+| :--- | :--- | :--- |
 | `ALCore/app/models.py` | **R** | Defines `PropertyDetails`, `LoanApplicationCreate` (including `validate_deposit`), and `LoanApplicationResponse`. |
 | `ALCore/app/main.py` | **R** | `submit_application` (`POST /applications`) returning HTTP `201` receipt `{"applicationId": ..., "message": ...}`. |
 | `ALCore/app/applications.py` | **R** | `create_application` (computes `requestedLoanAmount` and `estimatedLTV`) and `select_least_busy_broker` (raises `503` when no broker is available prior to Firestore write). |
@@ -78,57 +78,57 @@ This document catalogs the reusable components, modified files, new production a
 
 ## 4. Modified Production Files (M)
 
-| Action | File Path | Planned Modification | Cards |
-|---|---|---|---|
-| **M** | `app/src/main/java/com/mortgee/al_mobile/di/NetworkModule.kt` | Add `@Provides @Singleton fun provideLoanApplicationApi(retrofit: Retrofit, okHttpClient: OkHttpClient): LoanApplicationApi` with a derived `OkHttpClient` (`followRedirects(false)`, `followSslRedirects(false)`, `retryOnConnectionFailure(false)`) and a one-shot `RequestBody` interceptor (`isOneShot() = true`) so `POST /applications` is never silently re-transmitted. | `LA-04` |
-| **M** | `app/src/main/java/com/mortgee/al_mobile/di/RepositoryModule.kt` | Add `@Binds @Singleton abstract fun bindLoanApplicationRepository(impl: ApiLoanApplicationRepository): LoanApplicationRepository`. | `LA-14` |
-| **M** | `app/src/main/java/com/mortgee/al_mobile/ui/landing/AuthenticatedLandingScreen.kt` | Add optional `onStartLoanApplication: (() -> Unit)? = null` parameter and render a Material 3 `"Apply for a mortgage"` `Button` only when `authenticatedState?.role == BackendRole.BORROWER && onStartLoanApplication != null`. | `LA-20` |
-| **M** | `app/src/main/java/com/mortgee/al_mobile/ui/landing/AuthenticatedLandingRoute.kt` | Delegate the authenticated `BackendRole.BORROWER` branch to `LoanApplicationRoute(authenticatedState, onSignOut, modifier)` while preserving existing landing behavior for other roles and previews. | `LA-21` |
+| Action &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | File Path | Planned Modification | Cards |
+| :--- | :--- | :--- | :--- |
+| **M · Modify** | `app/src/main/java/com/mortgee/al_mobile/di/NetworkModule.kt` | Add `@Provides @Singleton fun provideLoanApplicationApi(retrofit: Retrofit, okHttpClient: OkHttpClient): LoanApplicationApi` with a derived `OkHttpClient` (`followRedirects(false)`, `followSslRedirects(false)`, `retryOnConnectionFailure(false)`) and a one-shot `RequestBody` interceptor (`isOneShot() = true`) so `POST /applications` is never silently re-transmitted. | `LA-04` |
+| **M · Modify** | `app/src/main/java/com/mortgee/al_mobile/di/RepositoryModule.kt` | Add `@Binds @Singleton abstract fun bindLoanApplicationRepository(impl: ApiLoanApplicationRepository): LoanApplicationRepository`. | `LA-14` |
+| **M · Modify** | `app/src/main/java/com/mortgee/al_mobile/ui/landing/AuthenticatedLandingScreen.kt` | Add optional `onStartLoanApplication: (() -> Unit)? = null` parameter and render a Material 3 `"Apply for a mortgage"` `Button` only when `authenticatedState?.role == BackendRole.BORROWER && onStartLoanApplication != null`. | `LA-20` |
+| **M · Modify** | `app/src/main/java/com/mortgee/al_mobile/ui/landing/AuthenticatedLandingRoute.kt` | Delegate the authenticated `BackendRole.BORROWER` branch to `LoanApplicationRoute(authenticatedState, onSignOut, modifier)` while preserving existing landing behavior for other roles and previews. | `LA-21` |
 
 ---
 
 ## 5. Created Production Files (C)
 
-| Action | File Path | Primary Symbols & Responsibilities | Reuse Lookup | Cards |
-|---|---|---|---|---|
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/network/model/LoanApplicationDtos.kt` | `LoanPropertyDto`, `CreateLoanRequest`, `CreateLoanReceipt`: Moshi DTOs with `@JsonClass(generateAdapter = false)` and exact `@Json(name = ...)` mappings for snake_case property keys (`floor_area`, `year_built`, `property_type`, `ber_rating`) and camelCase top-level keys. | `S1` | `LA-01`, `LA-02` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/network/LoanApplicationApi.kt` | `fun interface LoanApplicationApi` with `@POST("applications") suspend fun create(@Header("Authorization") bearer: String, @Body request: CreateLoanRequest): Response<CreateLoanReceipt>`. | `S1` | `LA-03` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/model/LoanField.kt` | `enum class LoanField(val path: String)` enumerating the 12 leaf wire paths (`INCOME`, `DEBT`, `DEPOSIT`, `TERM`, `PRICE`, `COUNTY`, `AREA`, `BEDS`, `BATHS`, `YEAR`, `TYPE`, `BER`). | `S2` | `LA-05` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanDraft.kt` | `data class LoanDraft(val values: Map<LoanField, String> = emptyMap(), val hasDebt: Boolean? = null)` with `get`, `edit`, and `chooseDebt` enforcing explicit Yes/No debt selection and clearing hidden debt input when `No` is selected. | `S2` | `LA-05` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanValidation.kt` | `Checked<T>`, `LoanFinances`, `loanMoney`, `validateFinances`, `validateProperty` (reusing `PropertyFormValidator` + required `BER`, `BATHS >= 0`, `YEAR in 1800..2030`), and `prepareLoan` building `CreateLoanRequest` only when all 12 checks succeed. | `S2` | `LA-06`, `LA-07`, `LA-08`, `LA-09` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/repository/LoanApplicationRepository.kt` | `fun interface LoanApplicationRepository { suspend fun submit(key: SessionKey, request: CreateLoanRequest): LoanSubmitResult }` and `sealed interface LoanSubmitResult` (`Created`, `Invalid`, `SignInRequired`, `Forbidden`, `NoBroker`, `NotSent`, `Unconfirmed`, `Stale`). | `S3` | `LA-10` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/repository/LoanHttpErrors.kt` | `decodeLoanValidation` (maps FastAPI `422` `detail[].loc` and root deposit `value_error` to `LoanField`) and `classifyLoanRejection` (`401 -> SignInRequired`, `403 -> Forbidden`, `422 -> Invalid`, exact `503 "No brokers are currently available" -> NoBroker`, everything else -> `Unconfirmed`). | `S3` | `LA-10`, `LA-11` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/data/repository/ApiLoanApplicationRepository.kt` | `class ApiLoanApplicationRepository @Inject constructor(api, seam, moshi)`: executes one mutation via `seam.executePrivate(key, isMutation = true)`, throws `HttpException` on non-2xx so `401` triggers seam invalidation, verifies `201` with non-blank `applicationId`, rethrows `CancellationException`, and maps preflight/transport errors safely. | `S3` | `LA-12` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanUiState.kt` | `enum class LoanPhase` (`CLOSED`, `EDITING`, `SENDING`, `RECEIPT`, `UNCONFIRMED`, `DENIED`), `data class LoanUiState`, `visibleErrors`, `canSubmit`, and `LoanUiState.afterResult(r: LoanSubmitResult)`. | `S4` | `LA-13` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationViewModel.kt` | `@HiltViewModel class LoanApplicationViewModel`: owns transient in-memory `LoanUiState`, observes `SessionOwner.sessionState` to clear state on session/generation change, and exposes `open(key)`, `close(key)`, `edit(key, f, text)`, `chooseDebt(key, yes)`, and single-flight `submit(key)`. | `S4` | `LA-14`, `LA-15`, `LA-16` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanFinanceFields.kt` | `@Composable fun LoanFinanceFields` and `@Composable internal fun LoanTextInput` rendering the 5 financial controls, `FilterChip` Yes/No debt toggle, conditional debt input, and `Modifier.testTag(f.path)`. | `S4` | `LA-17` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanPropertyFields.kt` | `@Composable fun LoanPropertyFields` rendering the 7 property inputs (`County`, `Floor area (m²)`, `Bedrooms`, `Bathrooms`, `Year built`, and dropdown pickers for `Property type` and `BER rating` backed by `PropertyFormValidator.VALID_*`). | `S4` | `LA-18` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationScreen.kt` | `@Composable fun LoanApplicationScreen` rendering `Affordability` and `Property` sections in `EDITING`/`SENDING`, progress indicator, and terminal views for `RECEIPT` (`"Reference: <receiptId>"`), `UNCONFIRMED`, and `DENIED`. | `S4` | `LA-19` |
-| **C** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationRoute.kt` | `@Composable fun LoanApplicationRoute` connecting `AuthenticatedLandingScreen` and `LoanApplicationScreen` to `LoanApplicationViewModel` with `BackHandler` protection during `SENDING`. | `S4` | `LA-21` |
+| Action &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | File Path | Primary Symbols & Responsibilities | Reuse Lookup | Cards |
+| :--- | :--- | :--- | :--- | :--- |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/network/model/LoanApplicationDtos.kt` | `LoanPropertyDto`, `CreateLoanRequest`, `CreateLoanReceipt`: Moshi DTOs with `@JsonClass(generateAdapter = false)` and exact `@Json(name = ...)` mappings for snake_case property keys (`floor_area`, `year_built`, `property_type`, `ber_rating`) and camelCase top-level keys. | `S1` | `LA-01`, `LA-02` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/network/LoanApplicationApi.kt` | `fun interface LoanApplicationApi` with `@POST("applications") suspend fun create(@Header("Authorization") bearer: String, @Body request: CreateLoanRequest): Response<CreateLoanReceipt>`. | `S1` | `LA-03` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/model/LoanField.kt` | `enum class LoanField(val path: String)` enumerating the 12 leaf wire paths (`INCOME`, `DEBT`, `DEPOSIT`, `TERM`, `PRICE`, `COUNTY`, `AREA`, `BEDS`, `BATHS`, `YEAR`, `TYPE`, `BER`). | `S2` | `LA-05` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanDraft.kt` | `data class LoanDraft(val values: Map<LoanField, String> = emptyMap(), val hasDebt: Boolean? = null)` with `get`, `edit`, and `chooseDebt` enforcing explicit Yes/No debt selection and clearing hidden debt input when `No` is selected. | `S2` | `LA-05` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanValidation.kt` | `Checked<T>`, `LoanFinances`, `loanMoney`, `validateFinances`, `validateProperty` (reusing `PropertyFormValidator` + required `BER`, `BATHS >= 0`, `YEAR in 1800..2030`), and `prepareLoan` building `CreateLoanRequest` only when all 12 checks succeed. | `S2` | `LA-06`, `LA-07`, `LA-08`, `LA-09` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/repository/LoanApplicationRepository.kt` | `fun interface LoanApplicationRepository { suspend fun submit(key: SessionKey, request: CreateLoanRequest): LoanSubmitResult }` and `sealed interface LoanSubmitResult` (`Created`, `Invalid`, `SignInRequired`, `Forbidden`, `NoBroker`, `NotSent`, `Unconfirmed`, `Stale`). | `S3` | `LA-10` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/repository/LoanHttpErrors.kt` | `decodeLoanValidation` (maps FastAPI `422` `detail[].loc` and root deposit `value_error` to `LoanField`) and `classifyLoanRejection` (`401 -> SignInRequired`, `403 -> Forbidden`, `422 -> Invalid`, exact `503 "No brokers are currently available" -> NoBroker`, everything else -> `Unconfirmed`). | `S3` | `LA-10`, `LA-11` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/data/repository/ApiLoanApplicationRepository.kt` | `class ApiLoanApplicationRepository @Inject constructor(api, seam, moshi)`: executes one mutation via `seam.executePrivate(key, isMutation = true)`, throws `HttpException` on non-2xx so `401` triggers seam invalidation, verifies `201` with non-blank `applicationId`, rethrows `CancellationException`, and maps preflight/transport errors safely. | `S3` | `LA-12` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanUiState.kt` | `enum class LoanPhase` (`CLOSED`, `EDITING`, `SENDING`, `RECEIPT`, `UNCONFIRMED`, `DENIED`), `data class LoanUiState`, `visibleErrors`, `canSubmit`, and `LoanUiState.afterResult(r: LoanSubmitResult)`. | `S4` | `LA-13` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationViewModel.kt` | `@HiltViewModel class LoanApplicationViewModel`: owns transient in-memory `LoanUiState`, observes `SessionOwner.sessionState` to clear state on session/generation change, and exposes `open(key)`, `close(key)`, `edit(key, f, text)`, `chooseDebt(key, yes)`, and single-flight `submit(key)`. | `S4` | `LA-14`, `LA-15`, `LA-16` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanFinanceFields.kt` | `@Composable fun LoanFinanceFields` and `@Composable internal fun LoanTextInput` rendering the 5 financial controls, `FilterChip` Yes/No debt toggle, conditional debt input, and `Modifier.testTag(f.path)`. | `S4` | `LA-17` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanPropertyFields.kt` | `@Composable fun LoanPropertyFields` rendering the 7 property inputs (`County`, `Floor area (m²)`, `Bedrooms`, `Bathrooms`, `Year built`, and dropdown pickers for `Property type` and `BER rating` backed by `PropertyFormValidator.VALID_*`). | `S4` | `LA-18` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationScreen.kt` | `@Composable fun LoanApplicationScreen` rendering `Affordability` and `Property` sections in `EDITING`/`SENDING`, progress indicator, and terminal views for `RECEIPT` (`"Reference: <receiptId>"`), `UNCONFIRMED`, and `DENIED`. | `S4` | `LA-19` |
+| **C · Create** | `app/src/main/java/com/mortgee/al_mobile/ui/loan/LoanApplicationRoute.kt` | `@Composable fun LoanApplicationRoute` connecting `AuthenticatedLandingScreen` and `LoanApplicationScreen` to `LoanApplicationViewModel` with `BackHandler` protection during `SENDING`. | `S4` | `LA-21` |
 
 ---
 
 ## 6. Created Test Files (C)
 
-| Action | File Path | Test Scope & Verification Target | Cards |
-|---|---|---|---|
-| **C** | `app/src/test/java/com/mortgee/al_mobile/data/network/model/LoanApplicationDtosTest.kt` | `propertyKeys` and `createContract`: verifies exact JSON keys, number types, and receipt decoding with `NetworkModule.provideMoshi()`. | `LA-01`, `LA-02` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/data/network/LoanApplicationApiTest.kt` | `createWire` and one-shot provider tests: verifies `POST /applications`, `Authorization` header, `307` no-redirect, `503` no-retry, and `SocketPolicy.DISCONNECT_AFTER_REQUEST` single transmission. | `LA-03`, `LA-04` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanDraftTest.kt` | Verifies distinct `LoanField.path` values, `hasDebt` transitions (`null` -> `true` -> `false`), and clearing hidden debt input. | `LA-05` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanValidationTest.kt` | `moneyParsing`, `financeRules`, `propertyRules`, and `prepareRequest`: verifies exact `BigDecimal`/`Double` parity, cross-field `deposit < price`, `1..40` term, `1800..2030` year built, required `BER`, and complete fixture assembly. | `LA-06`, `LA-07`, `LA-08`, `LA-09` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/data/repository/LoanHttpErrorsTest.kt` | `validationLocations`, `malformedValidation`, and `httpOutcomes`: verifies FastAPI `422` field and root deposit mapping, `401`, `403`, known `503` (`NoBroker`) vs generic `503`/`502`/`307` (`Unconfirmed`). | `LA-10`, `LA-11` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/data/repository/ApiLoanApplicationRepositoryTest.kt` | Verifies `executePrivate(key, isMutation = true)`, `HttpException(401)` propagation to seam, `201` with non-blank ID, `TokenFetchFailed -> NotSent` (0 HTTP calls), and `CancellationException` rethrow. | `LA-12` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanUiStateTest.kt` | Verifies `visibleErrors` precedence, `canSubmit` gating, and `afterResult` state transitions (`RECEIPT`, `UNCONFIRMED`, `DENIED`, `EDITING`). | `LA-13` |
-| **C** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanApplicationViewModelTest.kt` | `sessionOwnsDraft`, `changeOnlyCurrentDraft`, double-tap protection, same-UID new-generation stale completion isolation, and explicit retry after `NoBroker`. | `LA-14`, `LA-15`, `LA-16` |
-| **C** | `app/src/androidTest/java/com/mortgee/al_mobile/ui/loan/LoanApplicationScreenTest.kt` | `debtVisibility`, `propertyInputs`, and `submissionViews`: Compose UI instrumentation tests for financial inputs, conditional debt field, property dropdowns, progress state, and receipt reference display. | `LA-17`, `LA-18`, `LA-19` |
-| **C** | `app/src/androidTest/java/com/mortgee/al_mobile/ui/landing/LoanLandingActionTest.kt` | Compose UI instrumentation test verifying `"Apply for a mortgage"` button visibility exclusively for `BackendRole.BORROWER` when callback is supplied. | `LA-20` |
+| Action &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | File Path | Test Scope & Verification Target | Cards |
+| :--- | :--- | :--- | :--- |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/data/network/model/LoanApplicationDtosTest.kt` | `propertyKeys` and `createContract`: verifies exact JSON keys, number types, and receipt decoding with `NetworkModule.provideMoshi()`. | `LA-01`, `LA-02` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/data/network/LoanApplicationApiTest.kt` | `createWire` and one-shot provider tests: verifies `POST /applications`, `Authorization` header, `307` no-redirect, `503` no-retry, and `SocketPolicy.DISCONNECT_AFTER_REQUEST` single transmission. | `LA-03`, `LA-04` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanDraftTest.kt` | Verifies distinct `LoanField.path` values, `hasDebt` transitions (`null` -> `true` -> `false`), and clearing hidden debt input. | `LA-05` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanValidationTest.kt` | `moneyParsing`, `financeRules`, `propertyRules`, and `prepareRequest`: verifies exact `BigDecimal`/`Double` parity, cross-field `deposit < price`, `1..40` term, `1800..2030` year built, required `BER`, and complete fixture assembly. | `LA-06`, `LA-07`, `LA-08`, `LA-09` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/data/repository/LoanHttpErrorsTest.kt` | `validationLocations`, `malformedValidation`, and `httpOutcomes`: verifies FastAPI `422` field and root deposit mapping, `401`, `403`, known `503` (`NoBroker`) vs generic `503`/`502`/`307` (`Unconfirmed`). | `LA-10`, `LA-11` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/data/repository/ApiLoanApplicationRepositoryTest.kt` | Verifies `executePrivate(key, isMutation = true)`, `HttpException(401)` propagation to seam, `201` with non-blank ID, `TokenFetchFailed -> NotSent` (0 HTTP calls), and `CancellationException` rethrow. | `LA-12` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanUiStateTest.kt` | Verifies `visibleErrors` precedence, `canSubmit` gating, and `afterResult` state transitions (`RECEIPT`, `UNCONFIRMED`, `DENIED`, `EDITING`). | `LA-13` |
+| **C · Create** | `app/src/test/java/com/mortgee/al_mobile/ui/loan/LoanApplicationViewModelTest.kt` | `sessionOwnsDraft`, `changeOnlyCurrentDraft`, double-tap protection, same-UID new-generation stale completion isolation, and explicit retry after `NoBroker`. | `LA-14`, `LA-15`, `LA-16` |
+| **C · Create** | `app/src/androidTest/java/com/mortgee/al_mobile/ui/loan/LoanApplicationScreenTest.kt` | `debtVisibility`, `propertyInputs`, and `submissionViews`: Compose UI instrumentation tests for financial inputs, conditional debt field, property dropdowns, progress state, and receipt reference display. | `LA-17`, `LA-18`, `LA-19` |
+| **C · Create** | `app/src/androidTest/java/com/mortgee/al_mobile/ui/landing/LoanLandingActionTest.kt` | Compose UI instrumentation test verifying `"Apply for a mortgage"` button visibility exclusively for `BackendRole.BORROWER` when callback is supplied. | `LA-20` |
 
 ---
 
 ## 7. Dispatch & Dependency Order (`LA-01` – `LA-22`)
 
-| Card | Title / Outcome | Prerequisites | Target Files (`C` / `M`) | Status |
-|---|---|---|---|---|
+| Card &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Title / Outcome | Prerequisites | Target Files (`C` / `M`) | Status |
+| :--- | :--- | :--- | :--- | :--- |
 | **LA-01** | Encode the seven property fields | Ready now | `C LoanApplicationDtos.kt`, `C LoanApplicationDtosTest.kt` | **DONE** (`LoanPropertyDto`, `LoanApplicationDtosTest.propertyKeys`) |
 | **LA-02** | Encode a create request and decode its receipt | `LA-01` | `M LoanApplicationDtos.kt`, `M LoanApplicationDtosTest.kt` | **DONE** (`CreateLoanRequest`, `CreateLoanReceipt`, `LoanApplicationDtosTest.createContract`) |
 | **LA-03** | Send the create call to the existing HTTP route | `LA-02` | `C LoanApplicationApi.kt`, `C LoanApplicationApiTest.kt` | **DONE** (`LoanApplicationApi`, `LoanApplicationApiTest.createWire`) |
@@ -138,10 +138,10 @@ This document catalogs the reusable components, modified files, new production a
 | **LA-07** | Validate the five financial values together | `LA-05`, `LA-06` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`Checked`, `LoanFinances`, `validateFinances`, `LoanValidationTest.financeRules`) |
 | **LA-08** | Validate the complete ALCore property | `LA-07`, `LA-01` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`validateProperty`, `LoanValidationTest.propertyRules`) |
 | **LA-09** | Build a POST body only from a complete draft | `LA-08`, `LA-02` | `M LoanValidation.kt`, `M LoanValidationTest.kt` | **DONE** (`prepareLoan`, `LoanValidationTest.prepareRequest`) |
-| **LA-10** | Map FastAPI validation errors to form fields | `LA-02`, `LA-05` | `C LoanApplicationRepository.kt`, `C LoanHttpErrors.kt`, `C LoanHttpErrorsTest.kt` | Ready now |
-| **LA-11** | Distinguish confirmed rejections from an uncertain write | `LA-10` | `M LoanHttpErrors.kt`, `M LoanHttpErrorsTest.kt` | Pending |
+| **LA-10** | Map FastAPI validation errors to form fields | `LA-02`, `LA-05` | `C LoanApplicationRepository.kt`, `C LoanHttpErrors.kt`, `C LoanHttpErrorsTest.kt` | **DONE** (`LoanApplicationRepository`, `LoanSubmitResult`, `decodeLoanValidation`, `LoanHttpErrorsTest.validationLocations`, `LoanHttpErrorsTest.malformedValidation`) |
+| **LA-11** | Distinguish confirmed rejections from an uncertain write | `LA-10` | `M LoanHttpErrors.kt`, `M LoanHttpErrorsTest.kt` | Ready now |
 | **LA-12** | Submit once with the original borrower's session key | `LA-04`, `LA-11` | `C ApiLoanApplicationRepository.kt`, `C ApiLoanApplicationRepositoryTest.kt` | Pending (`LA-11` prerequisite) |
-| **LA-13** | Turn a submission outcome into form or receipt state | `LA-09`, `LA-10` | `C LoanUiState.kt`, `C LoanUiStateTest.kt` | Pending |
+| **LA-13** | Turn a submission outcome into form or receipt state | `LA-09`, `LA-10` | `C LoanUiState.kt`, `C LoanUiStateTest.kt` | Ready now |
 | **LA-14** | Retain one draft for the active borrower | `LA-12`, `LA-13` | `C LoanApplicationViewModel.kt`, `M RepositoryModule.kt`, `C LoanApplicationViewModelTest.kt` | Pending |
 | **LA-15** | Apply form edits to the current open draft | `LA-14` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Pending |
 | **LA-16** | Guard double taps and late submission results | `LA-15` | `M LoanApplicationViewModel.kt`, `M LoanApplicationViewModelTest.kt` | Pending |
