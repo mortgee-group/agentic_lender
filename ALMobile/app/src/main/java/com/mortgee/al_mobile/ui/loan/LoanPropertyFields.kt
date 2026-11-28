@@ -301,7 +301,7 @@ fun LoanPropertyFieldsErrorsPreview() {
         LoanPropertyFields(
             draft = LoanDraft(),
             errors = mapOf(
-                LoanField.COUNTY to "Enter the county.",
+                LoanField.COUNTY to "Select a county from the list.",
                 LoanField.TYPE to "Property type is required",
                 LoanField.BER to "BER rating is required",
             ),

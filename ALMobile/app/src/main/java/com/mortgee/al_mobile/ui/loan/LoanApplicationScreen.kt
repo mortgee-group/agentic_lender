@@ -281,7 +281,7 @@ private val previewValidLoanDraft = LoanDraft(
         LoanField.DEPOSIT to "70000",
         LoanField.TERM to "30",
         LoanField.PRICE to "350000",
-        LoanField.COUNTY to "Kilkenny",
+        LoanField.COUNTY to "co. Kilkenny",
         LoanField.AREA to "115",
         LoanField.BEDS to "3",
         LoanField.BATHS to "2",

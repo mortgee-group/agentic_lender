@@ -347,7 +347,7 @@ class LoanApplicationViewModelTest {
         viewModel.edit(key, LoanField.DEPOSIT, "70000")
         viewModel.edit(key, LoanField.TERM, "30")
         viewModel.edit(key, LoanField.PRICE, "350000")
-        viewModel.edit(key, LoanField.COUNTY, "Kilkenny")
+        viewModel.edit(key, LoanField.COUNTY, "co. Kilkenny")
         viewModel.edit(key, LoanField.AREA, "115")
         viewModel.edit(key, LoanField.BEDS, "3")
         viewModel.edit(key, LoanField.BATHS, "2")

@@ -368,7 +368,7 @@ class LoanApplicationScreenTest {
         composeRule.onNodeWithText("Affordability").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Enter a non-negative amount in euros.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Property").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Enter the county.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Select a county from the list.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithText("Back to account").assertIsDisplayed().assertIsEnabled()
         assertEquals(0, submitCount)

@@ -16,7 +16,7 @@ private const val DEBT_CHOICE_ERROR = "Choose Yes or No."
 private const val TERM_ERROR = "Enter a whole number from 1 to 40."
 private const val PRICE_ERROR = "Enter an asking price greater than zero."
 private const val DEPOSIT_PRICE_ERROR = "Deposit must be less than the asking price."
-private const val COUNTY_ERROR = "Enter the county."
+private const val COUNTY_ERROR = "Select a county from the list."
 private const val BATHS_ERROR = "Enter zero or more whole bathrooms."
 private const val YEAR_ERROR = "Enter a build year from 1800 to 2030."
 private const val BER_REQUIRED_ERROR = "Choose a BER rating."
@@ -126,8 +126,8 @@ fun validateProperty(d: LoanDraft): Checked<LoanPropertyDto> {
 
     val errors = linkedMapOf<LoanField, String>()
 
-    val county = base.parsedLocation
-    if (!base.isLocationValid || county == null) {
+    val county = d[LoanField.COUNTY].takeIf { IrishCounties.isSelection(it) }
+    if (county == null) {
         errors[LoanField.COUNTY] = COUNTY_ERROR
     }
 

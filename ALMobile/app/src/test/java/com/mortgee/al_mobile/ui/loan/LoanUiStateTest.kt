@@ -20,7 +20,7 @@ class LoanUiStateTest {
         .edit(LoanField.DEPOSIT, "70000")
         .edit(LoanField.TERM, "30")
         .edit(LoanField.PRICE, "350000")
-        .edit(LoanField.COUNTY, "Kilkenny")
+        .edit(LoanField.COUNTY, "co. Kilkenny")
         .edit(LoanField.AREA, "115")
         .edit(LoanField.BEDS, "3")
         .edit(LoanField.BATHS, "2")

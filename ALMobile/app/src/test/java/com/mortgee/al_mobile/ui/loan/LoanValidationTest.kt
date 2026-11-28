@@ -3,6 +3,7 @@ package com.mortgee.al_mobile.ui.loan
 import com.mortgee.al_mobile.data.model.LoanField
 import com.mortgee.al_mobile.data.network.model.CreateLoanRequest
 import com.mortgee.al_mobile.data.network.model.LoanPropertyDto
+import com.mortgee.al_mobile.di.NetworkModule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -127,7 +128,7 @@ class LoanValidationTest {
     @Test
     fun propertyRules() {
         val validStudio = LoanDraft()
-            .edit(LoanField.COUNTY, " Kilkenny ")
+            .edit(LoanField.COUNTY, "co. Kilkenny")
             .edit(LoanField.AREA, "115")
             .edit(LoanField.BEDS, "0")
             .edit(LoanField.BATHS, "0")
@@ -138,7 +139,7 @@ class LoanValidationTest {
         val checkedStudio = validateProperty(validStudio)
         assertEquals(
             LoanPropertyDto(
-                county = "Kilkenny",
+                county = "co. Kilkenny",
                 floorArea = 115.0,
                 bedrooms = 0,
                 bathrooms = 0,
@@ -159,7 +160,7 @@ class LoanValidationTest {
         )
         assertEquals(
             LoanPropertyDto(
-                county = "Kilkenny",
+                county = "co. Kilkenny",
                 floorArea = 115.0,
                 bedrooms = 3,
                 bathrooms = 2,
@@ -170,6 +171,15 @@ class LoanValidationTest {
             year2030.value,
         )
         assertTrue(year2030.errors.isEmpty())
+
+        for (badCounty in listOf("", "Cork", "co. Atlantis", " co. Kilkenny ", "co. cork")) {
+            val res = validateProperty(validStudio.edit(LoanField.COUNTY, badCounty))
+            assertNull(res.value)
+            assertEquals(
+                mapOf(LoanField.COUNTY to "Select a county from the list."),
+                res.errors,
+            )
+        }
 
         for (badYear in listOf("1799", "2031", "", "abc")) {
             val res = validateProperty(validStudio.edit(LoanField.YEAR, badYear))
@@ -228,7 +238,7 @@ class LoanValidationTest {
         assertNull(emptyProperty.value)
         assertEquals(
             mapOf(
-                LoanField.COUNTY to "Enter the county.",
+                LoanField.COUNTY to "Select a county from the list.",
                 LoanField.AREA to "Property size is required",
                 LoanField.BEDS to "Number of bedrooms is required",
                 LoanField.BATHS to "Enter zero or more whole bathrooms.",
@@ -249,7 +259,7 @@ class LoanValidationTest {
             .edit(LoanField.DEPOSIT, "70000")
             .edit(LoanField.TERM, "30")
             .edit(LoanField.PRICE, "350000")
-            .edit(LoanField.COUNTY, "Kilkenny")
+            .edit(LoanField.COUNTY, "co. Kilkenny")
             .edit(LoanField.AREA, "115")
             .edit(LoanField.BEDS, "3")
             .edit(LoanField.BATHS, "2")
@@ -258,7 +268,7 @@ class LoanValidationTest {
             .edit(LoanField.BER, "B2")
 
         val expectedProperty = LoanPropertyDto(
-            county = "Kilkenny",
+            county = "co. Kilkenny",
             floorArea = 115.0,
             bedrooms = 3,
             bathrooms = 2,
@@ -296,6 +306,29 @@ class LoanValidationTest {
         )
         assertTrue(checkedNoDebt.errors.isEmpty())
 
+        // Serialize the request produced by prepareLoan() for an otherwise valid draft with Cork selected
+        val corkDraft = completeWithDebt.edit(LoanField.COUNTY, "co. Cork")
+        val corkChecked = prepareLoan(corkDraft)
+        assertTrue(corkChecked.errors.isEmpty())
+        val corkRequest = requireNotNull(corkChecked.value)
+        assertEquals("co. Cork", corkRequest.property.county)
+
+        val moshi = NetworkModule.provideMoshi()
+        val corkJson = moshi.adapter(CreateLoanRequest::class.java).toJson(corkRequest)
+        val corkJsonMap = moshi.adapter(Map::class.java).fromJson(corkJson) as Map<*, *>
+        val corkPropertyMap = corkJsonMap["property"] as Map<*, *>
+        assertEquals("co. Cork", corkPropertyMap["county"])
+
+        // Repeat with "", "Cork" and "co. Atlantis" and verify that no request can be built
+        for (invalidCounty in listOf("", "Cork", "co. Atlantis")) {
+            val invalidChecked = prepareLoan(completeWithDebt.edit(LoanField.COUNTY, invalidCounty))
+            assertNull(invalidChecked.value)
+            assertEquals(
+                mapOf(LoanField.COUNTY to "Select a county from the list."),
+                invalidChecked.errors,
+            )
+        }
+
         val fourAffordabilityAlone = LoanDraft()
             .edit(LoanField.INCOME, "75000")
             .chooseDebt(true)
@@ -307,7 +340,7 @@ class LoanValidationTest {
         assertEquals(
             mapOf(
                 LoanField.PRICE to "Enter an asking price greater than zero.",
-                LoanField.COUNTY to "Enter the county.",
+                LoanField.COUNTY to "Select a county from the list.",
                 LoanField.AREA to "Property size is required",
                 LoanField.BEDS to "Number of bedrooms is required",
                 LoanField.BATHS to "Enter zero or more whole bathrooms.",
