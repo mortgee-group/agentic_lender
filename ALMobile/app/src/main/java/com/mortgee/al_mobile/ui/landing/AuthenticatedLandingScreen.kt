@@ -31,15 +31,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.mortgee.al_mobile.data.model.BackendRole
+import com.mortgee.al_mobile.data.session.SessionKey
 import com.mortgee.al_mobile.data.session.SessionState
+import com.mortgee.al_mobile.ui.theme.ALMobileTheme
 
 /**
  * Shared authenticated landing screen displaying session status and user profile details.
  *
  * Displays user profile information (uid, email, display_name, role, first_name, last_name, phone_number, createdAt, updatedAt)
  * when an authenticated session is active.
- * Provides an optional session exit action ([onSignOut]).
+ * Provides an optional session exit action ([onSignOut]) and an optional borrower mortgage
+ * application entry action ([onStartLoanApplication]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +52,7 @@ fun AuthenticatedLandingScreen(
     modifier: Modifier = Modifier,
     authenticatedState: SessionState.Authenticated? = null,
     onSignOut: (() -> Unit)? = null,
+    onStartLoanApplication: (() -> Unit)? = null,
 ) {
     Scaffold(
         modifier = modifier,
@@ -108,9 +114,24 @@ fun AuthenticatedLandingScreen(
                         textAlign = TextAlign.Center
                     )
 
-                    if (onSignOut != null) {
+                    if (authenticatedState?.role == BackendRole.BORROWER && onStartLoanApplication != null) {
                         Spacer(modifier = Modifier.height(24.dp))
 
+                        Button(
+                            onClick = onStartLoanApplication,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Apply for a mortgage")
+                        }
+
+                        if (onSignOut != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    } else if (onSignOut != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+
+                    if (onSignOut != null) {
                         Button(
                             onClick = onSignOut,
                             modifier = Modifier.fillMaxWidth()
@@ -183,5 +204,34 @@ private fun ProfileDetailRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AuthenticatedLandingScreenBorrowerPreview() {
+    ALMobileTheme {
+        AuthenticatedLandingScreen(
+            authenticatedState = SessionState.Authenticated(
+                key = SessionKey(uid = "borrower-1", generation = 1L),
+                uid = "borrower-1",
+                email = "borrower@example.com",
+                role = BackendRole.BORROWER,
+                displayName = "Alex Murphy",
+                firstName = "Alex",
+                lastName = "Murphy",
+                phoneNumber = "+353 87 123 4567",
+            ),
+            onSignOut = {},
+            onStartLoanApplication = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AuthenticatedLandingScreenDefaultPreview() {
+    ALMobileTheme {
+        AuthenticatedLandingScreen()
     }
 }
