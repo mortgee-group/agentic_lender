@@ -8,7 +8,10 @@ import httpx
 import logging
 from datetime import datetime, timezone
 from app.ai_client import assess_application, underwrite_application
-from app.tokenization import tokenize_approved_application
+from app.tokenization import (
+    tokenize_approved_application,
+    get_existing_tokenization,
+)
 from app.applications import (
     create_application,
     get_application,
@@ -27,6 +30,7 @@ from app.models import (
     LoanApplicationResponse,
     UnderwriterDecisionRequest,
     ApplicationStatus,
+    TokenizationResponse,
 )
 logger = logging.getLogger(__name__)
 app = FastAPI(
@@ -158,20 +162,12 @@ def submit_application(
     }
 
 
-@app.get(
-    "/applications/{application_id}",
-    response_model=LoanApplicationResponse,
-)
-def retrieve_application(
+def get_authorized_application(
     application_id: str,
-    profile: UserProfile = Depends(
-        require_role(
-            UserRole.BORROWER,
-            UserRole.BROKER,
-            UserRole.UNDERWRITER,
-        )
-    ),
-):
+    profile: UserProfile,
+) -> LoanApplicationResponse:
+    """Retrieve an application and enforce application-level access."""
+
     application = get_application(application_id)
 
     if application is None:
@@ -194,7 +190,32 @@ def retrieve_application(
                 detail="Insufficient permissions",
             )
 
+    elif profile.role != UserRole.UNDERWRITER:
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient permissions",
+        )
+
     return application
+
+
+@app.get(
+    "/applications/{application_id}",
+    response_model=LoanApplicationResponse,
+)
+def retrieve_application(
+    application_id: str,
+    profile: UserProfile = Depends(
+        require_role(
+            UserRole.BORROWER,
+            UserRole.BROKER,
+            UserRole.UNDERWRITER,
+        )
+    ),
+):
+    """Retrieve an authorized mortgage application."""
+
+    return get_authorized_application(application_id, profile)
 
 
 @app.get("/applications", response_model=list[LoanApplicationResponse])
@@ -421,3 +442,34 @@ def tokenize_mortgage_application(
         application_id=application_id,
         underwriter_id=profile.uid,
     )
+
+
+@app.get(
+    "/applications/{application_id}/tokenization",
+    response_model=TokenizationResponse,
+    response_model_exclude_none=True,
+)
+def retrieve_tokenization(
+    application_id: str,
+    profile: UserProfile = Depends(
+        require_role(
+            UserRole.BORROWER,
+            UserRole.BROKER,
+            UserRole.UNDERWRITER,
+        )
+    ),
+):
+    """Retrieve a saved mortgage tokenization record."""
+
+    # Verify application access before retrieving blockchain metadata.
+    get_authorized_application(application_id, profile)
+
+    record = get_existing_tokenization(application_id)
+
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Tokenization record not found",
+        )
+
+    return record
