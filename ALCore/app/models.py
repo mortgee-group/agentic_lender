@@ -147,3 +147,22 @@ class UnderwriterDecisionRequest(BaseModel):
             )
 
         return self
+
+
+class TokenizationStatus(str, Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+
+
+class TokenizationResponse(BaseModel):
+    applicationId: str
+    status: TokenizationStatus
+
+    tokenId: int | None = Field(default=None, ge=0)
+    transactionHash: str | None = None
+    contractAddress: str | None = None
+    chainId: int | None = Field(default=None, gt=0)
+    auditHash: str | None = None
+
+    createdAt: datetime | None = None
+    completedAt: datetime | None = None
