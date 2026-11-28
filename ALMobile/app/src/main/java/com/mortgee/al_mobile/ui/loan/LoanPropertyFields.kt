@@ -5,15 +5,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -35,13 +42,10 @@ fun LoanPropertyFields(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        LoanTextInput(
-            f = LoanField.COUNTY,
-            label = "County",
+        LoanCountyPicker(
             draft = draft,
             errors = errors,
             enabled = enabled,
-            keyboard = KeyboardType.Text,
             onEdit = onEdit,
         )
 
@@ -104,6 +108,102 @@ fun LoanPropertyFields(
             enabled = enabled,
             onEdit = onEdit,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LoanCountyPicker(
+    draft: LoanDraft,
+    errors: Map<LoanField, String>,
+    enabled: Boolean,
+    onEdit: (LoanField, String) -> Unit,
+) {
+    val selectedValue = draft[LoanField.COUNTY]
+    val fieldError = errors[LoanField.COUNTY]
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var isSearching by rememberSaveable { mutableStateOf(false) }
+
+    if (selectedValue.isNotEmpty() && isSearching) {
+        isSearching = false
+        searchQuery = ""
+    }
+
+    val displayedText = if (isSearching) searchQuery else selectedValue
+    val activeQuery = if (isSearching) searchQuery else ""
+    val suggestions = remember(activeQuery) { IrishCounties.search(activeQuery) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && enabled,
+        onExpandedChange = { nextExpanded ->
+            if (enabled) {
+                expanded = nextExpanded
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = displayedText,
+            onValueChange = { nextText ->
+                if (enabled) {
+                    isSearching = true
+                    searchQuery = nextText
+                    expanded = true
+                    if (selectedValue.isNotEmpty()) {
+                        onEdit(LoanField.COUNTY, "")
+                    }
+                }
+            },
+            label = { Text("County") },
+            singleLine = true,
+            isError = fieldError != null,
+            supportingText = fieldError?.let { errorMessage ->
+                {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && enabled)
+            },
+            enabled = enabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = enabled)
+                .fillMaxWidth()
+                .testTag(LoanField.COUNTY.path),
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+        ) {
+            if (suggestions.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No counties found") },
+                    onClick = {},
+                    enabled = false,
+                )
+            } else {
+                suggestions.forEach { label ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            if (enabled) {
+                                isSearching = false
+                                searchQuery = ""
+                                expanded = false
+                                onEdit(LoanField.COUNTY, label)
+                            }
+                        },
+                        enabled = enabled,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -178,7 +278,7 @@ fun LoanPropertyFieldsFilledPreview() {
         LoanPropertyFields(
             draft = LoanDraft(
                 values = mapOf(
-                    LoanField.COUNTY to "Kilkenny",
+                    LoanField.COUNTY to "co. Kilkenny",
                     LoanField.AREA to "115",
                     LoanField.BEDS to "3",
                     LoanField.BATHS to "2",

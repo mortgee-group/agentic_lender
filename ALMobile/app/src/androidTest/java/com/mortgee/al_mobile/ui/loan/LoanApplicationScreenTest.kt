@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mortgee.al_mobile.data.model.LoanField
 import com.mortgee.al_mobile.data.repository.LoanSubmitResult
@@ -178,14 +179,17 @@ class LoanApplicationScreenTest {
         composeRule.onNodeWithTag(LoanField.BER.path).assertTextContains("EXEMPT")
         assertEquals(0, composeRule.onAllNodesWithText("A1").fetchSemanticsNodes().size)
 
-        // Enter county, floor area, bedrooms "0", bathrooms "0", and year "2005"
+        // Search and pick county from dropdown, then enter floor area, bedrooms "0", bathrooms "0", and year "2005"
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performClick()
         composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextInput("Kilkenny")
+        assertEquals("", draft[LoanField.COUNTY])
+        composeRule.onNodeWithText("co. Kilkenny").performClick()
         composeRule.onNodeWithTag(LoanField.AREA.path).performTextInput("115")
         composeRule.onNodeWithTag(LoanField.BEDS.path).performTextInput("0")
         composeRule.onNodeWithTag(LoanField.BATHS.path).performTextInput("0")
         composeRule.onNodeWithTag(LoanField.YEAR.path).performTextInput("2005")
 
-        assertEquals("Kilkenny", draft[LoanField.COUNTY])
+        assertEquals("co. Kilkenny", draft[LoanField.COUNTY])
         assertEquals("115", draft[LoanField.AREA])
         assertEquals("0", draft[LoanField.BEDS])
         assertEquals("0", draft[LoanField.BATHS])
@@ -213,6 +217,106 @@ class LoanApplicationScreenTest {
     }
 
     @Test
+    fun countySearchablePickerWorkflow() {
+        val baseDraft = LoanDraft(
+            values = mapOf(
+                LoanField.INCOME to "75000",
+                LoanField.DEBT to "10000",
+                LoanField.DEPOSIT to "70000",
+                LoanField.TERM to "30",
+                LoanField.PRICE to "350000",
+                LoanField.AREA to "115",
+                LoanField.BEDS to "3",
+                LoanField.BATHS to "2",
+                LoanField.YEAR to "2005",
+                LoanField.TYPE to "SEMI_DETACHED",
+                LoanField.BER to "B2",
+            ),
+            hasDebt = true,
+        )
+
+        var state by mutableStateOf(
+            LoanUiState(
+                phase = LoanPhase.EDITING,
+                draft = baseDraft,
+            )
+        )
+
+        composeRule.setContent {
+            LoanApplicationScreen(
+                state = state,
+                onEdit = { field, text ->
+                    state = state.copy(
+                        draft = state.draft.edit(field, text),
+                        touched = state.touched + field,
+                    )
+                },
+                onDebt = { yes ->
+                    state = state.copy(
+                        draft = state.draft.chooseDebt(yes),
+                        touched = state.touched + LoanField.DEBT,
+                    )
+                },
+                onSubmit = {},
+                onBack = {},
+            )
+        }
+
+        // Initially county is blank, Submit is disabled
+        assertEquals("", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+
+        // Open the picker: tapping it opens all 32 choices for manual selection
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performScrollTo().performClick()
+        for (option in IrishCounties.OPTIONS) {
+            assertEquals(
+                "Expected $option in dropdown",
+                1,
+                composeRule.onAllNodesWithText(option).fetchSemanticsNodes().size,
+            )
+        }
+
+        // Type "c", verify filtered choices and tap "co. Cork"
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextInput("c")
+        assertEquals("", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithText("co. Cork").assertIsDisplayed().performClick()
+
+        // Verify the draft contains "co. Cork", full label is displayed, dropdown closes, Submit is enabled
+        assertEquals("co. Cork", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).assertTextContains("co. Cork")
+        assertEquals(0, composeRule.onAllNodesWithText("co. Carlow").fetchSemanticsNodes().size)
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsEnabled()
+
+        // Reopen it, type "Dub", and dismiss without selecting
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performClick()
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextReplacement("Dub")
+
+        // Typing after a selection immediately clears the previous draft selection
+        assertEquals("", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithText("co. Dublin").assertIsDisplayed()
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+
+        // Dismiss without selecting (click trailing icon / toggle dropdown closed)
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performClick()
+        assertEquals(0, composeRule.onAllNodesWithText("co. Dublin").fetchSemanticsNodes().size)
+        assertEquals("", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsNotEnabled()
+
+        // Open again, verify non-matching query shows "No counties found"
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performClick()
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextReplacement("Atlantis")
+        composeRule.onNodeWithText("No counties found").assertIsDisplayed()
+        assertEquals("", state.draft[LoanField.COUNTY])
+
+        // Type "Dub" and select "co. Dublin"
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).performTextReplacement("Dub")
+        composeRule.onNodeWithText("co. Dublin").assertIsDisplayed().performClick()
+        assertEquals("co. Dublin", state.draft[LoanField.COUNTY])
+        composeRule.onNodeWithTag(LoanField.COUNTY.path).assertTextContains("co. Dublin")
+        composeRule.onNodeWithText("Submit application").assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test
     fun submissionViews() {
         val validDraft = LoanDraft(
             values = mapOf(
@@ -221,7 +325,7 @@ class LoanApplicationScreenTest {
                 LoanField.DEPOSIT to "70000",
                 LoanField.TERM to "30",
                 LoanField.PRICE to "350000",
-                LoanField.COUNTY to "Kilkenny",
+                LoanField.COUNTY to "co. Kilkenny",
                 LoanField.AREA to "115",
                 LoanField.BEDS to "3",
                 LoanField.BATHS to "2",
@@ -356,7 +460,7 @@ class LoanApplicationScreenTest {
                 LoanField.DEPOSIT to "70000",
                 LoanField.TERM to "30",
                 LoanField.PRICE to "350000",
-                LoanField.COUNTY to "Kilkenny",
+                LoanField.COUNTY to "co. Kilkenny",
                 LoanField.AREA to "115",
                 LoanField.BEDS to "3",
                 LoanField.BATHS to "2",
